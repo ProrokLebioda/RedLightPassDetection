@@ -351,11 +351,4 @@ healthchecksdb
 
 # Backup folder for Package Reference Convert tool in Visual Studio 2017
 MigrationBackup/
-<<<<<<< HEAD
-/RedLightViolationDetection/RedLightViolationDetection/data/CarsDrivingUnderBridge.mp4
-/RedLightViolationDetection/RedLightViolationDetection/data/crossroad.mp4
-/RedLightViolationDetection/RedLightViolationDetection/data/crossroad2.mp4
-/RedLightViolationDetection/RedLightViolationDetection/data/crossroad3.mp4
-=======
-RedLightViolationDetection/RedLightViolationDetection/data/CarsDrivingUnderBridge.mp4
->>>>>>> master
+RedLightViolationDetection/RedLightViolationDetection/data/ipCam-Sokolowka-720p.mp4
