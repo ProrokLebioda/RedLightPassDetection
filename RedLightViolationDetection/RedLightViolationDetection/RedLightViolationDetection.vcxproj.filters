@@ -21,6 +21,9 @@
     <ClInclude Include="detector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RedLightViolationDetection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RedLightViolationDetection.cpp">

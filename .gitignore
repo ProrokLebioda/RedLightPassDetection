@@ -352,3 +352,19 @@ healthchecksdb
 # Backup folder for Package Reference Convert tool in Visual Studio 2017
 MigrationBackup/
 RedLightViolationDetection/RedLightViolationDetection/data/ipCam-Sokolowka-720p.mp4
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolov3.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolov3.cfg
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolov3-tiny.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolov3-spp.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolov3-openimages.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolov2.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolov2-tiny.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolov2-tiny-voc.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolo9000.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/yolo-voc.weights
+RedLightViolationDetection/RedLightViolationDetection/data/yolo/coco.names
+RedLightViolationDetection/RedLightViolationDetection/data/video/00004.MTS
+RedLightViolationDetection/RedLightViolationDetection/data/video/00001_yolo_out_cpp.avi
+RedLightViolationDetection/RedLightViolationDetection/data/video/00001.MTS
+RedLightViolationDetection/RedLightViolationDetection/data/video/ipCam-Sokolowka-720p.mp4
+RedLightViolationDetection/RedLightViolationDetection/data/video/CarsDrivingUnderBridge.mp4

@@ -159,6 +159,7 @@
   <ItemGroup>
     <ClInclude Include="blob.h" />
     <ClInclude Include="detector.h" />
+    <ClInclude Include="RedLightViolationDetection.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="blob.cpp" />
