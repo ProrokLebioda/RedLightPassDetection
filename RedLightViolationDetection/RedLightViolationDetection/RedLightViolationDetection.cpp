@@ -27,7 +27,7 @@ int main(int argc, char** argv)
 
 	// Give the configuration and weight files for the model
 	String modelConfiguration = "data/yolo/yolov3.cfg";
-	String modelWeights = "data/yolo/yolov3.weights";
+	String modelWeights = "data/yolo/yolov3_final.weights";
 
 	// Load the network
 	Net net = readNetFromDarknet(modelConfiguration, modelWeights);
@@ -39,6 +39,7 @@ int main(int argc, char** argv)
 	VideoCapture cap;
 	VideoWriter video;
 	Mat frame, blob;
+	Mat frameCut;
 
 	try {
 
@@ -71,18 +72,31 @@ int main(int argc, char** argv)
 	//set the callback function for any mouse event
 	setMouseCallback(kWinName, CallBackFunc, NULL);
 	cap >> frame;
-	while (cv::waitKey(1)&&!endLine)
+	
+	while (cv::waitKey(1) && !endLine)
 	{
 		putText(frame, "Paint line", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0,Scalar(255,0,255),10);
+		cv::circle(frame, cv::Point(inX, inY), 1, Scalar(255, 0, 0));
+		cv::circle(frame, cv::Point(outX, outY), 1, Scalar(255, 0, 0));
+		
 		imshow(kWinName, frame);
-
+		
 	}
+	bool once = false;
+	Rect2d myROI;
+
+	Mat croppedFrame;
 	// Process frames.
 	while (cv::waitKey(1) < 0)
 	{
 		// get frame from the video
 		cap >> frame;
-
+		if (!once)// Select ROI
+		{
+			myROI = selectROI(frame);
+			croppedFrame = frame(myROI);
+			once = true;
+		}
 		// Stop the program if reached end of video
 		if (frame.empty()) {
 			cout << "Done processing !!!" << endl;
@@ -90,8 +104,9 @@ int main(int argc, char** argv)
 			cv::waitKey(3000);
 			break;
 		}
-		// Create a 4D blob from a frame.
-		blobFromImage(frame, blob, 1 / 255.0, cvSize(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
+		
+		cv::rectangle(frame, myROI, cv::Scalar(255, 0, 0));
+		blobFromImage(croppedFrame, blob, 1 / 255.0, cvSize(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
 		net.setInput(blob);
@@ -101,7 +116,7 @@ int main(int argc, char** argv)
 		net.forward(outs, getOutputsNames(net));
 
 		// Remove the bounding boxes with low confidence
-		postprocess(frame, outs);
+		postprocess(croppedFrame, outs);
 
 		// Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
 		vector<double> layersTimes;
@@ -112,8 +127,8 @@ int main(int argc, char** argv)
 
 		// Write the frame with the detection boxes
 		Mat detectedFrame;
-		frame.convertTo(detectedFrame, CV_8U);
-		video.write(detectedFrame);
+		croppedFrame.convertTo(frame, CV_8U);
+		video.write(frame);
 		cv::line(frame, Point(inX,inY), Point(outX, outY), (0, 0, 255), 10);
 		imshow(kWinName, frame);
 
