@@ -24,6 +24,8 @@ vector<string> classes;
 int inX = 0, inY = 0;//starting position for pass line
 int outX = 0, outY = 0;//ending position for pass line
 bool endLine = false;
+void selectUserROI(Rect2d &myROI, Mat frame, Mat& croppedFrame, bool &once, string kWinName);
+void mainLoop(Net net, VideoCapture cap, VideoWriter video, Mat frame, Mat croppedFrame, Mat blob, string outputFile, string kWinName);
 
 //function responsible for taking position of pass line
 void CallBackFunc(int event, int x, int y, int flags, void* userdata);

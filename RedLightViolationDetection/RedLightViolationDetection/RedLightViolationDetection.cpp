@@ -82,21 +82,43 @@ int main(int argc, char** argv)
 		imshow(kWinName, frame);
 		
 	}
-	bool once = false;
-	Rect2d myROI;
+	
+
 
 	Mat croppedFrame;
 	// Process frames.
+	
+	mainLoop(net,cap,video,frame,croppedFrame,blob,outputFile,kWinName);
+
+	cap.release();
+	video.release();
+
+	cv::waitKey(0);
+	return 0;
+}
+
+void selectUserROI(Rect2d &myROI,Mat frame, Mat& croppedFrame, bool &once,string kWinName)
+{
+
+	if (!once)// Select ROI
+	{
+		myROI = selectROI(kWinName,frame);
+		croppedFrame = frame(myROI);
+		once = true;
+	}
+}
+
+void mainLoop(Net net, VideoCapture cap, VideoWriter video, Mat frame, Mat croppedFrame, Mat blob, string outputFile, string kWinName)
+{
+	Rect2d myROI;
+	bool once = false;
 	while (cv::waitKey(1) < 0)
 	{
 		// get frame from the video
 		cap >> frame;
-		if (!once)// Select ROI
-		{
-			myROI = selectROI(frame);
-			croppedFrame = frame(myROI);
-			once = true;
-		}
+		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
+		selectUserROI(myROI, frame, croppedFrame, once,kWinName);
+		
 		// Stop the program if reached end of video
 		if (frame.empty()) {
 			cout << "Done processing !!!" << endl;
@@ -104,7 +126,7 @@ int main(int argc, char** argv)
 			cv::waitKey(3000);
 			break;
 		}
-		
+
 		cv::rectangle(frame, myROI, cv::Scalar(255, 0, 0));
 		blobFromImage(croppedFrame, blob, 1 / 255.0, cvSize(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
@@ -127,18 +149,12 @@ int main(int argc, char** argv)
 
 		// Write the frame with the detection boxes
 		Mat detectedFrame;
-		croppedFrame.convertTo(frame, CV_8U);
+		frame.convertTo(frame, CV_8U);
 		video.write(frame);
-		cv::line(frame, Point(inX,inY), Point(outX, outY), (0, 0, 255), 10);
+		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		imshow(kWinName, frame);
 
 	}
-
-	cap.release();
-	video.release();
-
-	cv::waitKey(0);
-	return 0;
 }
 
 // Remove the bounding boxes with low confidence using non-maxima suppression
