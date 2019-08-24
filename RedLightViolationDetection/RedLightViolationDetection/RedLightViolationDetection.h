@@ -24,6 +24,8 @@ vector<string> classes;
 int inX = 0, inY = 0;//starting position for pass line
 int outX = 0, outY = 0;//ending position for pass line
 bool endLine = false;
+string loadClasses(string classesFile);
+bool openVideoOrCam(string &outputFile, VideoCapture &cap, CommandLineParser parser);
 void selectUserROI(Rect2d &myROI, Mat frame, Mat& croppedFrame, bool &once, string kWinName);
 void mainLoop(Net net, VideoCapture cap, VideoWriter video, Mat frame, Mat croppedFrame, Mat blob, string outputFile, string kWinName);
 

@@ -21,9 +21,8 @@ int main(int argc, char** argv)
 	}
 	// Load names of classes
 	string classesFile = "data/yolo/coco.names";
-	ifstream ifs(classesFile.c_str());
-	string line;
-	while (getline(ifs, line)) classes.push_back(line);
+	string line=loadClasses(classesFile);
+	
 
 	// Give the configuration and weight files for the model
 	String modelConfiguration = "data/yolo/yolov3.cfg";
@@ -32,37 +31,18 @@ int main(int argc, char** argv)
 	// Load the network
 	Net net = readNetFromDarknet(modelConfiguration, modelWeights);
 	net.setPreferableBackend(DNN_BACKEND_OPENCV);
-	net.setPreferableTarget(DNN_TARGET_CPU);
+	net.setPreferableTarget(DNN_TARGET_OPENCL);
 
 	// Open a video file or a camera stream.
-	string str, outputFile;
+	string outputFile;
 	VideoCapture cap;
+	
+	if (!openVideoOrCam(outputFile, cap,parser))
+		return 0;
+	
 	VideoWriter video;
 	Mat frame, blob;
 	Mat frameCut;
-
-	try {
-
-		outputFile = "yolo_out_cpp.avi";
-		if (parser.has("video"))
-		{
-			// Open the video file
-			str = parser.get<String>("video");
-			ifstream ifile(str);
-			if (!ifile) throw("error");
-			cap.open(str);
-			str.replace(str.end() - 4, str.end(), "_yolo_out_cpp.avi");
-			outputFile = str;
-		}
-		// Open the webcaom
-		else cap.open(parser.get<int>("device"));
-
-	}
-	catch (...) {
-		cout << "Could not open the input video stream" << endl;
-		return 0;
-	}
-
 	// Get the video writer initialized to save the output video
 	video.open(outputFile, VideoWriter::fourcc('M', 'J', 'P', 'G'), 28, Size(cap.get(CAP_PROP_FRAME_WIDTH), cap.get(CAP_PROP_FRAME_HEIGHT)));
 	
@@ -83,8 +63,6 @@ int main(int argc, char** argv)
 		
 	}
 	
-
-
 	Mat croppedFrame;
 	// Process frames.
 	
@@ -95,6 +73,41 @@ int main(int argc, char** argv)
 
 	cv::waitKey(0);
 	return 0;
+}
+
+string loadClasses(string classesFile)
+{
+	ifstream ifs(classesFile.c_str());
+	string line;
+	while (getline(ifs, line)) classes.push_back(line);
+	return line;
+}
+
+bool openVideoOrCam(string &outputFile, VideoCapture &cap, CommandLineParser parser)
+{
+	string str;
+	try {
+
+		outputFile = "yolo_out_cpp.avi";
+		if (parser.has("video"))
+		{
+			// Open the video file
+			str = parser.get<String>("video");
+			ifstream ifile(str);
+			if (!ifile) throw("error");
+			cap.open(str);
+			str.replace(str.end() - 4, str.end(), "_yolo_out_cpp.avi");
+			outputFile = str;
+		}
+		// Open the webcam
+		else cap.open(parser.get<int>("device"));
+		return true;
+	}
+	catch (...) {
+		cout << "Could not open the input video stream" << endl;
+		return false;
+	}
+	return false;
 }
 
 void selectUserROI(Rect2d &myROI,Mat frame, Mat& croppedFrame, bool &once,string kWinName)
