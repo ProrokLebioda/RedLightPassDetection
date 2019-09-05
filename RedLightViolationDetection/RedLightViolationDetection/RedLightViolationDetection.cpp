@@ -23,16 +23,10 @@ int main(int argc, char** argv)
 	string classesFile = "data/yolo/coco.names";
 	string line=loadClasses(classesFile);
 	
-
-	// Give the configuration and weight files for the model
-	String modelConfiguration = "data/yolo/yolov3.cfg";
-	String modelWeights = "data/yolo/yolov3_final.weights";
-
 	// Load the network
-	Net net = readNetFromDarknet(modelConfiguration, modelWeights);
-	net.setPreferableBackend(DNN_BACKEND_OPENCV);
-	net.setPreferableTarget(DNN_TARGET_OPENCL);
+	Net net = loadNetwork();
 
+	
 	// Open a video file or a camera stream.
 	string outputFile;
 	VideoCapture cap;
@@ -42,7 +36,6 @@ int main(int argc, char** argv)
 	
 	VideoWriter video;
 	Mat frame, blob;
-	Mat frameCut;
 	// Get the video writer initialized to save the output video
 	video.open(outputFile, VideoWriter::fourcc('M', 'J', 'P', 'G'), 28, Size(cap.get(CAP_PROP_FRAME_WIDTH), cap.get(CAP_PROP_FRAME_HEIGHT)));
 	
@@ -63,10 +56,8 @@ int main(int argc, char** argv)
 		
 	}
 	
-	Mat croppedFrame;
 	// Process frames.
-	
-	mainLoop(net,cap,video,frame,croppedFrame,blob,outputFile,kWinName);
+	mainLoop(net,cap,video,frame,blob,outputFile,kWinName);
 
 	cap.release();
 	video.release();
@@ -110,6 +101,19 @@ bool openVideoOrCam(string &outputFile, VideoCapture &cap, CommandLineParser par
 	return false;
 }
 
+Net loadNetwork()
+{
+	// Give the configuration and weight files for the model
+	String modelConfiguration = "data/yolo/yolov3.cfg";
+	String modelWeights = "data/yolo/yolov3_final.weights";
+
+	// Load the network
+	Net net = readNetFromDarknet(modelConfiguration, modelWeights);
+	net.setPreferableBackend(DNN_BACKEND_OPENCV);
+	net.setPreferableTarget(DNN_TARGET_OPENCL);
+	return net;
+}
+
 void selectUserROI(Rect2d &myROI,Mat frame, Mat& croppedFrame, bool &once,string kWinName)
 {
 
@@ -121,19 +125,22 @@ void selectUserROI(Rect2d &myROI,Mat frame, Mat& croppedFrame, bool &once,string
 	}
 }
 
-void mainLoop(Net net, VideoCapture cap, VideoWriter video, Mat frame, Mat croppedFrame, Mat blob, string outputFile, string kWinName)
+void mainLoop(Net net, VideoCapture cap, VideoWriter video, Mat frame, Mat blob, string outputFile, string kWinName)
 {
-	Rect2d myROI;
+	Rect2d myROI;	
+	Mat croppedFrame;
 	bool once = false;
 	while (cv::waitKey(1) < 0)
 	{
 		// get frame from the video
 		cap >> frame;
+		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
 		selectUserROI(myROI, frame, croppedFrame, once,kWinName);
 		
-		// Stop the program if reached end of video
-		if (frame.empty()) {
+		// Stop the program if we reached end of video
+		if (frame.empty())
+		{
 			cout << "Done processing !!!" << endl;
 			cout << "Output file is stored as " << outputFile << endl;
 			cv::waitKey(3000);
@@ -164,7 +171,7 @@ void mainLoop(Net net, VideoCapture cap, VideoWriter video, Mat frame, Mat cropp
 		Mat detectedFrame;
 		frame.convertTo(frame, CV_8U);
 		video.write(frame);
-		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
+		//cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		imshow(kWinName, frame);
 
 	}

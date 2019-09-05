@@ -26,8 +26,9 @@ int outX = 0, outY = 0;//ending position for pass line
 bool endLine = false;
 string loadClasses(string classesFile);
 bool openVideoOrCam(string &outputFile, VideoCapture &cap, CommandLineParser parser);
+Net loadNetwork();
 void selectUserROI(Rect2d &myROI, Mat frame, Mat& croppedFrame, bool &once, string kWinName);
-void mainLoop(Net net, VideoCapture cap, VideoWriter video, Mat frame, Mat croppedFrame, Mat blob, string outputFile, string kWinName);
+void mainLoop(Net net, VideoCapture cap, VideoWriter video, Mat frame, Mat blob, string outputFile, string kWinName);
 
 //function responsible for taking position of pass line
 void CallBackFunc(int event, int x, int y, int flags, void* userdata);
