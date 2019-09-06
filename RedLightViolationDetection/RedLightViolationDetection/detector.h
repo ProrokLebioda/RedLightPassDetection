@@ -1,36 +1,54 @@
 #pragma once
 
-#include <opencv2/opencv.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <fstream>
+#include <sstream>
+#include <iostream>
 
+#include <opencv2/opencv.hpp>
+#include <opencv2/dnn.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 class Blob;
+using namespace cv;
+using namespace dnn;
+using namespace std;
+
+//function responsible for taking position of pass line
+void CallBackFunc(int event, int x, int y, int flags, void* userdata);
 
 class Detector
 {
 private:
-	cv::VideoCapture capVideo;
-	struct ScalarColors
-	{
-		const cv::Scalar SCALAR_BLACK = cv::Scalar(0.0, 0.0, 0.0);
-		const cv::Scalar SCALAR_WHITE = cv::Scalar(255.0, 255.0, 255.0);
-		const cv::Scalar SCALAR_YELLOW = cv::Scalar(0.0, 255.0, 255.0);
-		const cv::Scalar SCALAR_GREEN = cv::Scalar(0.0, 200.0, 0.0);
-		const cv::Scalar SCALAR_RED = cv::Scalar(0.0, 0.0, 255.0);
-	}
-	SC;
+	string classesLine;
+	Net net;
+	VideoCapture cap;
+	VideoWriter video;
+	Mat frame, blob;
+	string outputFile;
+	string kWinName;
+	Rect2d myROI;
+	Mat croppedFrame;
 
-	void MatchCurrentFrameBlobsToExistingBlobs(std::vector<Blob>& existingBlobs, std::vector<Blob>& currentFrameBlobs);
-	void AddBlobToExistingBlobs(Blob & currentFrameBlob, std::vector<Blob>& existingBlobs, int & intIndex);
-	void AddNewBlob(Blob & currentFrameBlob, std::vector<Blob>& existingBlobs);
-	double DistanceBetweenPoints(cv::Point point1, cv::Point point2);
-	void DrawAndShowContours(cv::Size imageSize, std::vector<std::vector<cv::Point> > contours, std::string strImageName);
-	void DrawAndShowContours(cv::Size imageSize, std::vector<Blob> blobs, std::string strImageName);
-	void DrawBlobInfoOnImage(std::vector<Blob>& blobs, cv::Mat & imgFrame2Copy);
-	bool CheckIfBlobsCrossedTheLine(std::vector<Blob> &blobs, int &intHorizontalLinePosition, int &carCount);
-	void DrawCarCountOnImage(int &carCount, cv::Mat &imgFrame2Copy);
-
+	float confThreshold = 0.5; // Confidence threshold
+	float nmsThreshold = 0.4;  // Non-maximum suppression threshold
+	int inpWidth = 416;  // Width of network's input image
+	int inpHeight = 416; // Height of network's input image
+	vector<string> classes;
 public:
-	int Detect(cv::String filename);
-	
+	Detector(string classesFile);
+
+	int detectorProgram(CommandLineParser parser);
+	string loadClasses(string classesFile);
+	bool openVideoOrCam(CommandLineParser parser);
+	void loadNetwork();
+	void selectUserROI(bool &once);
+	void detectionLoop();
+	// Remove the bounding boxes with low confidence using non-maxima suppression
+	void postprocess(Mat& frame, const vector<Mat>& out);
+
+	// Draw the predicted bounding box
+	void drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i);
+
+	// Get the names of the output layers
+	vector<String> getOutputsNames();
 };

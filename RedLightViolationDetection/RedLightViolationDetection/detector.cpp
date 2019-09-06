@@ -1,334 +1,278 @@
+
+#pragma once
 #include "detector.h"
-#include "blob.h"
-#include <conio.h>
+//#include "blob.h"
+//#include <conio.h>
 
-/*
-*	Main method. Responsible for detecting cars.
-*
-*
-*/
-int Detector::Detect(cv::String filename)
-{	
-	cv::Mat frame1;
-	cv::Mat frame2;
+// globals for mouse callback
+int inX = 0, inY = 0;//starting position for pass line
+int outX = 0, outY = 0;//ending position for pass line
+bool endLine = false;
 
-	std::vector<Blob> blobs;
-	cv::Point crossingLine[2];
+Detector::Detector(string classesFile) :
+	confThreshold(0.5), nmsThreshold(0.4),
+	inpWidth(416), inpHeight(416)
+{
+	classesLine = loadClasses(classesFile);
+}
 
-	int carCount = 0;
+int Detector::detectorProgram(CommandLineParser parser)
+{
+	loadNetwork();
 
-	capVideo.open(filename);
+	if (!openVideoOrCam(parser))
+		return 0;
 
-	if (!capVideo.isOpened()) {                                                 // if unable to open video file
-		std::cout << "Error reading video file" << std::endl << std::endl;      // show error message
-		_getch();                    // it may be necessary to change or remove this line if not using Windows
-		return(0);                                                              // and exit program
-	}
-
-	if (capVideo.get(CV_CAP_PROP_FRAME_COUNT) < 2) {
-		std::cout << "Error: video file must have at least two frames";
-		_getch();
-		return(0);
-	}
-
-	capVideo.read(frame1);
-	capVideo.read(frame2);
-
-	int intHorizontalLinePosition = (int)std::round((double)frame1.rows * 0.75);
+	// Get the video writer initialized to save the output video
+	video.open(outputFile, VideoWriter::fourcc('M', 'J', 'P', 'G'), 28, Size(cap.get(CAP_PROP_FRAME_WIDTH), cap.get(CAP_PROP_FRAME_HEIGHT)));
 	
-	crossingLine[0].x = 0;
-	crossingLine[0].y = intHorizontalLinePosition;
+	// Create a window
+	kWinName = "Deep learning object detection in OpenCV";
+	namedWindow(kWinName, WINDOW_NORMAL);
+	//set the callback function for any mouse event
+	setMouseCallback(kWinName, CallBackFunc, NULL);
+	cap >> frame;
 
-	crossingLine[1].x = frame1.cols - 1;
-	crossingLine[1].y = intHorizontalLinePosition;
+	while (cv::waitKey(1) && !endLine)
+	{
+		putText(frame, "Paint line", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
+		cv::circle(frame, cv::Point(inX, inY), 1, Scalar(255, 0, 0));
+		cv::circle(frame, cv::Point(outX, outY), 1, Scalar(255, 0, 0));
 
+		imshow(kWinName, frame);
 
-	char chCheckForEscKey = 0;
+	}
 
-	bool blnFirstFrame = true;
+	detectionLoop();
 
-	int frameCount = 2;
+	cap.release();
+	video.release();
 
-	while (capVideo.isOpened() && chCheckForEscKey != 27) {
+	cv::waitKey(0);
+	return 0;
+}
 
-		std::vector<Blob> currentFrameBlobs;
+string Detector::loadClasses(string classesFile)
+{
+	ifstream ifs(classesFile.c_str());
+	string line;
+	while (getline(ifs, line)) classes.push_back(line);
+	return line;
+}
 
-		cv::Mat imgFrame1Copy = frame1.clone();
-		cv::Mat imgFrame2Copy = frame2.clone();
+bool Detector::openVideoOrCam(CommandLineParser parser)
+{
+	string str;
+	try {
 
-		cv::Mat imgDifference;
-		cv::Mat imgThresh;
-
-		cv::cvtColor(imgFrame1Copy, imgFrame1Copy, CV_BGR2GRAY);
-		cv::cvtColor(imgFrame2Copy, imgFrame2Copy, CV_BGR2GRAY);
-
-		cv::GaussianBlur(imgFrame1Copy, imgFrame1Copy, cv::Size(5, 5), 0);
-		cv::GaussianBlur(imgFrame2Copy, imgFrame2Copy, cv::Size(5, 5), 0);
-
-		cv::absdiff(imgFrame1Copy, imgFrame2Copy, imgDifference);
-
-		cv::threshold(imgDifference, imgThresh, 30, 255.0, CV_THRESH_BINARY);
-
-		//cv::imshow("imgThresh", imgThresh);
-
-		cv::Mat structuringElement3x3 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-		cv::Mat structuringElement5x5 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
-		cv::Mat structuringElement7x7 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7, 7));
-		cv::Mat structuringElement9x9 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
-
-		/*
-		cv::dilate(imgThresh, imgThresh, structuringElement7x7);
-		cv::erode(imgThresh, imgThresh, structuringElement3x3);
-		*/
-
-		for (unsigned int i = 0; i < 2; i++) {
-			cv::dilate(imgThresh, imgThresh, structuringElement5x5);
-			cv::dilate(imgThresh, imgThresh, structuringElement5x5);
-			cv::erode(imgThresh, imgThresh, structuringElement5x5);
+		outputFile = "yolo_out_cpp.avi";
+		if (parser.has("video"))
+		{
+			// Open the video file
+			str = parser.get<String>("video");
+			ifstream ifile(str);
+			if (!ifile) throw("error");
+			cap.open(str);
+			str.replace(str.end() - 4, str.end(), "_yolo_out_cpp.avi");
+			outputFile = str;
 		}
+		// Open the webcam
+		else cap.open(parser.get<int>("device"));
+		return true;
+	}
+	catch (...) {
+		cout << "Could not open the input video stream" << endl;
+		return false;
+	}
+	return false;
+}
 
-		cv::Mat imgThreshCopy = imgThresh.clone();
 
-		std::vector<std::vector<cv::Point> > contours;
+void Detector::loadNetwork()
+{
+	// Give the configuration and weight files for the model
+	String modelConfiguration = "data/yolo/yolov3.cfg";
+	String modelWeights = "data/yolo/yolov3_final.weights";
 
-		cv::findContours(imgThreshCopy, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+	// Load the network
+	net = readNetFromDarknet(modelConfiguration, modelWeights);
+	net.setPreferableBackend(DNN_BACKEND_OPENCV);
+	net.setPreferableTarget(DNN_TARGET_OPENCL);
+}
 
-		//DrawAndShowContours(imgThresh.size(), contours, "imgContours");
+void Detector::selectUserROI(bool &once)
+{
 
-		std::vector<std::vector<cv::Point> > convexHulls(contours.size());
+	if (!once)// Select ROI
+	{
+		myROI = selectROI(kWinName, frame);
+		croppedFrame = frame(myROI);
+		once = true;
+	}
+}
 
-		for (unsigned int i = 0; i < contours.size(); i++) {
-			cv::convexHull(contours[i], convexHulls[i]);
-		}
+void Detector::detectionLoop()
+{
+	bool once = false;
+	while (cv::waitKey(1) < 0)
+	{
+		// get frame from the video
+		cap >> frame;
+		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
+		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
+		selectUserROI(once);
 
-		//DrawAndShowContours(imgThresh.size(), convexHulls, "imgConvexHulls");
-
-		for (auto &convexHull : convexHulls) {
-			Blob possibleBlob(convexHull);
-
-			if (possibleBlob.currentBoundingRect.area() > 400 &&
-                possibleBlob.dblCurrentAspectRatio > 0.2 &&
-                possibleBlob.dblCurrentAspectRatio < 4.0 &&
-                possibleBlob.currentBoundingRect.width > 30 &&
-                possibleBlob.currentBoundingRect.height > 30 &&
-                possibleBlob.dblCurrentDiagonalSize > 60.0 &&
-                (cv::contourArea(possibleBlob.currentContour) / (double)possibleBlob.currentBoundingRect.area()) > 0.50) {
-                currentFrameBlobs.push_back(possibleBlob);
-			}
-		}
-
-		//DrawAndShowContours(imgThresh.size(), currentFrameBlobs, "imgCurrentFrameBlobs");
-
-		if (blnFirstFrame == true) {
-			for (auto &currentFrameBlob : currentFrameBlobs) {
-				blobs.push_back(currentFrameBlob);
-			}
-		}
-		else {
-			MatchCurrentFrameBlobsToExistingBlobs(blobs, currentFrameBlobs);
-		}
-
-		//DrawAndShowContours(imgThresh.size(), blobs, "imgBlobs");
-
-		imgFrame2Copy = frame2.clone();          // get another copy of frame 2 since we changed the previous frame 2 copy in the processing above
-
-		DrawBlobInfoOnImage(blobs, imgFrame2Copy);
-
-		bool blnAtLeastOneBlobCrossedTheLine = CheckIfBlobsCrossedTheLine(blobs, intHorizontalLinePosition, carCount);
-
-		if (blnAtLeastOneBlobCrossedTheLine == true) {
-			cv::line(imgFrame2Copy, crossingLine[0], crossingLine[1], SC.SCALAR_GREEN, 2);
-		}
-		else {
-			cv::line(imgFrame2Copy, crossingLine[0], crossingLine[1], SC.SCALAR_RED, 2);
-		}
-
-		DrawCarCountOnImage(carCount, imgFrame2Copy);
-
-		cv::imshow("imgFrame2Copy", imgFrame2Copy);
-
-		//cv::waitKey(0);                 // uncomment this line to go frame by frame for debugging
-
-				// now we prepare for the next iteration
-
-		currentFrameBlobs.clear();
-
-		frame1 = frame2.clone();           // move frame 1 up to where frame 2 is
-
-		if ((capVideo.get(CV_CAP_PROP_POS_FRAMES) + 1) < capVideo.get(CV_CAP_PROP_FRAME_COUNT)) {
-			capVideo.read(frame2);
-		}
-		else {
-			std::cout << "end of video\n";
+		// Stop the program if we reached end of video
+		if (frame.empty())
+		{
+			cout << "Done processing !!!" << endl;
+			cout << "Output file is stored as " << outputFile << endl;
+			cv::waitKey(3000);
 			break;
 		}
 
-		blnFirstFrame = false;
-		frameCount++;
-		chCheckForEscKey = cv::waitKey(1);
-	}
+		cv::rectangle(frame, myROI, cv::Scalar(255, 0, 0));
+		blobFromImage(croppedFrame, blob, 1 / 255.0, cvSize(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
-	if (chCheckForEscKey != 27) {               // if the user did not press esc (i.e. we reached the end of the video)
-		cv::waitKey(0);                         // hold the windows open to allow the "end of video" message to show
-	}
-	// note that if the user did press esc, we don't need to hold the windows open, we can simply let the program end which will close the windows
+		//Sets the input to the network
+		net.setInput(blob);
 
-	return(0);
-}
+		// Runs the forward pass to get output of the output layers
+		vector<Mat> outs;
+		net.forward(outs, getOutputsNames());
 
-void Detector::MatchCurrentFrameBlobsToExistingBlobs(std::vector<Blob> &existingBlobs, std::vector<Blob> &currentFrameBlobs) {
+		// Remove the bounding boxes with low confidence
+		postprocess(croppedFrame, outs);
 
-	for (auto &existingBlob : existingBlobs) {
+		// Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
+		vector<double> layersTimes;
+		double freq = getTickFrequency() / 1000;
+		double t = net.getPerfProfile(layersTimes) / freq;
+		string label = format("Inference time for a frame : %.2f ms", t);
+		putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 
-		existingBlob.blnCurrentMatchFoundOrNewBlob = false;
-
-		existingBlob.predictNextPosition();
-	}
-
-	for (auto &currentFrameBlob : currentFrameBlobs) {
-
-		int intIndexOfLeastDistance = 0;
-		double dblLeastDistance = 100000.0;
-
-		for (unsigned int i = 0; i < existingBlobs.size(); i++) {
-			if (existingBlobs[i].blnStillBeingTracked == true) {
-				double dblDistance = DistanceBetweenPoints(currentFrameBlob.centerPositions.back(), existingBlobs[i].predictedNextPosition);
-
-				if (dblDistance < dblLeastDistance) {
-					dblLeastDistance = dblDistance;
-					intIndexOfLeastDistance = i;
-				}
-			}
-		}
-
-		if (dblLeastDistance < currentFrameBlob.dblCurrentDiagonalSize * 1.15) {
-			AddBlobToExistingBlobs(currentFrameBlob, existingBlobs, intIndexOfLeastDistance);
-		}
-		else {
-			AddNewBlob(currentFrameBlob, existingBlobs);
-		}
+		// Write the frame with the detection boxes
+		frame.convertTo(frame, CV_8U);
+		video.write(frame);
+		//cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
+		imshow(kWinName, frame);
 
 	}
-
-	for (auto &existingBlob : existingBlobs) {
-
-		if (existingBlob.blnCurrentMatchFoundOrNewBlob == false) {
-			existingBlob.intNumOfConsecutiveFramesWithoutAMatch++;
-		}
-
-		if (existingBlob.intNumOfConsecutiveFramesWithoutAMatch >= 5) {
-			existingBlob.blnStillBeingTracked = false;
-		}
-
-	}
-
 }
 
-void Detector::AddBlobToExistingBlobs(Blob &currentFrameBlob, std::vector<Blob> &existingBlobs, int &intIndex) {
-
-	existingBlobs[intIndex].currentContour = currentFrameBlob.currentContour;
-	existingBlobs[intIndex].currentBoundingRect = currentFrameBlob.currentBoundingRect;
-
-	existingBlobs[intIndex].centerPositions.push_back(currentFrameBlob.centerPositions.back());
-
-	existingBlobs[intIndex].dblCurrentDiagonalSize = currentFrameBlob.dblCurrentDiagonalSize;
-	existingBlobs[intIndex].dblCurrentAspectRatio = currentFrameBlob.dblCurrentAspectRatio;
-
-	existingBlobs[intIndex].blnStillBeingTracked = true;
-	existingBlobs[intIndex].blnCurrentMatchFoundOrNewBlob = true;
-}
-
-void Detector::AddNewBlob(Blob &currentFrameBlob, std::vector<Blob> &existingBlobs) {
-
-	currentFrameBlob.blnCurrentMatchFoundOrNewBlob = true;
-
-	existingBlobs.push_back(currentFrameBlob);
-}
-
-double Detector::DistanceBetweenPoints(cv::Point point1, cv::Point point2) {
-
-	int intX = abs(point1.x - point2.x);
-	int intY = abs(point1.y - point2.y);
-
-	return(sqrt(pow(intX, 2) + pow(intY, 2)));
-}
-
-void Detector::DrawAndShowContours(cv::Size imageSize, std::vector<std::vector<cv::Point> > contours, std::string strImageName) {
-	cv::Mat image(imageSize, CV_8UC3, SC.SCALAR_BLACK);
-
-	cv::drawContours(image, contours, -1, SC.SCALAR_WHITE, -1);
-
-	cv::imshow(strImageName, image);
-}
-
-void Detector::DrawAndShowContours(cv::Size imageSize, std::vector<Blob> blobs, std::string strImageName) {
-
-	cv::Mat image(imageSize, CV_8UC3, SC.SCALAR_BLACK);
-
-	std::vector<std::vector<cv::Point> > contours;
-
-	for (auto &blob : blobs) {
-		if (blob.blnStillBeingTracked == true) {
-			contours.push_back(blob.currentContour);
-		}
-	}
-
-	cv::drawContours(image, contours, -1, SC.SCALAR_WHITE, -1);
-
-	cv::imshow(strImageName, image);
-}
-
-void Detector::DrawBlobInfoOnImage(std::vector<Blob> &blobs, cv::Mat &imgFrame2Copy) {
-
-	for (unsigned int i = 0; i < blobs.size(); i++) {
-
-		if (blobs[i].blnStillBeingTracked == true) {
-			cv::rectangle(imgFrame2Copy, blobs[i].currentBoundingRect, SC.SCALAR_RED, 2);
-
-			int intFontFace = CV_FONT_HERSHEY_SIMPLEX;
-			double dblFontScale = blobs[i].dblCurrentDiagonalSize / 60.0;
-			int intFontThickness = (int)std::round(dblFontScale * 1.0);
-
-			cv::putText(imgFrame2Copy, std::to_string(i), blobs[i].centerPositions.back(), intFontFace, dblFontScale, SC.SCALAR_GREEN, intFontThickness);
-		}
-	}
-}
-
-bool Detector::CheckIfBlobsCrossedTheLine(std::vector<Blob>& blobs, int & intHorizontalLinePosition, int & carCount)
+// Remove the bounding boxes with low confidence using non-maxima suppression
+void Detector::postprocess(Mat& frame, const vector<Mat>& outs)
 {
-	bool blnAtLeastOneBlobCrossedTheLine = false;
+	vector<int> classIds;
+	vector<float> confidences;
+	vector<Rect> boxes;
 
-	for (auto blob : blobs) {
+	for (size_t i = 0; i < outs.size(); ++i)
+	{
+		// Scan through all the bounding boxes output from the network and keep only the
+		// ones with high confidence scores. Assign the box's class label as the class
+		// with the highest score for the box.
+		float* data = (float*)outs[i].data;
+		for (int j = 0; j < outs[i].rows; ++j, data += outs[i].cols)
+		{
+			Mat scores = outs[i].row(j).colRange(5, outs[i].cols);
+			Point classIdPoint;
+			double confidence;
+			// Get the value and location of the maximum score
+			minMaxLoc(scores, 0, &confidence, 0, &classIdPoint);
+			//1 - bicycle, 2 - car,3 - motorbike, 5 - bus, 7 - truck, 9 - traffic_light 
+			if (classIdPoint.x != 1 && classIdPoint.x != 2 && classIdPoint.x != 3 && classIdPoint.x != 5 && classIdPoint.x != 7 /*&& classIdPoint.x != 9*/)
+				continue;
+			if (confidence > confThreshold)
+			{
+				int centerX = (int)(data[0] * frame.cols);
+				int centerY = (int)(data[1] * frame.rows);
+				int width = (int)(data[2] * frame.cols);
+				int height = (int)(data[3] * frame.rows);
+				int left = centerX - width / 2;
+				int top = centerY - height / 2;
 
-		if (blob.blnStillBeingTracked == true && blob.centerPositions.size() >= 2) {
-			int prevFrameIndex = (int)blob.centerPositions.size() - 2;
-			int currFrameIndex = (int)blob.centerPositions.size() - 1;
-
-			if (blob.centerPositions[prevFrameIndex].y > intHorizontalLinePosition && blob.centerPositions[currFrameIndex].y <= intHorizontalLinePosition) {
-				carCount++;
-				blnAtLeastOneBlobCrossedTheLine = true;
+				classIds.push_back(classIdPoint.x);
+				confidences.push_back((float)confidence);
+				boxes.push_back(Rect(left, top, width, height));
 			}
 		}
-
 	}
 
-	return blnAtLeastOneBlobCrossedTheLine;
+	// Perform non maximum suppression to eliminate redundant overlapping boxes with
+	// lower confidences
+	vector<int> indices;
+	NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
+	for (size_t i = 0; i < indices.size(); ++i)
+	{
+		int idx = indices[i];
+		Rect box = boxes[idx];
+		drawPred(classIds[idx], confidences[idx], box.x, box.y,
+			box.x + box.width, box.y + box.height, frame, i);
+	}
 }
 
+// Draw the predicted bounding box
+void Detector::drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i)
+{
+	//Draw a rectangle displaying the bounding box
+	rectangle(frame, Point(left, top), Point(right, bottom), Scalar(255, 178, 50), 3);
 
-void Detector::DrawCarCountOnImage(int &carCount, cv::Mat &imgFrame2Copy) {
+	//Get the label for the class name and its confidence
+	string label = format("%.2f", conf);
+	if (!classes.empty())
+	{
+		CV_Assert(classId < (int)classes.size());
+		label = classes[classId] + ":" + label;
+	}
 
-	int intFontFace = CV_FONT_HERSHEY_SIMPLEX;
-	double dblFontScale = (imgFrame2Copy.rows * imgFrame2Copy.cols) / 300000.0;
-	int intFontThickness = (int)std::round(dblFontScale * 1.5);
+	//Display the label at the top of the bounding box
+	int baseLine;
+	Size labelSize = getTextSize(label, FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseLine);
+	top = max(top, labelSize.height);
+	rectangle(frame, Point(left, top - round(1.5*labelSize.height)), Point(left + round(1.5*labelSize.width), top + baseLine), Scalar(255, 255, 255), FILLED);
+	putText(frame, to_string(classId), Point(left, top - ((top - bottom) / 2)), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0, 0, 255), 1);
+	putText(frame, label, Point(left, top), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0, 0, 0), 1);
+}
 
-	cv::Size textSize = cv::getTextSize(std::to_string(carCount), intFontFace, dblFontScale, intFontThickness, 0);
+// Get the names of the output layers
+vector<String> Detector::getOutputsNames()
+{
+	static vector<String> names;
+	if (names.empty())
+	{
+		//Get the indices of the output layers, i.e. the layers with unconnected outputs
+		vector<int> outLayers = net.getUnconnectedOutLayers();
 
-	cv::Point ptTextBottomLeftPosition;
+		//get the names of all the layers in the network
+		vector<String> layersNames = net.getLayerNames();
 
-	ptTextBottomLeftPosition.x = imgFrame2Copy.cols - 1 - (int)((double)textSize.width * 1.25);
-	ptTextBottomLeftPosition.y = (int)((double)textSize.height * 1.25);
+		// Get the names of the output layers in names
+		names.resize(outLayers.size());
+		for (size_t i = 0; i < outLayers.size(); ++i)
+			names[i] = layersNames[outLayers[i] - 1];
+	}
+	return names;
+}
 
-	cv::putText(imgFrame2Copy, std::to_string(carCount), ptTextBottomLeftPosition, intFontFace, dblFontScale, SC.SCALAR_GREEN, intFontThickness);
+void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+{
+	if (event == EVENT_LBUTTONDOWN)
+	{
+		cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+		inX = x;
+		inY = y;
+	}
+	if (event == EVENT_LBUTTONUP)
+	{
+		cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+		outX = x;
+		outY = y;
+		endLine = true;
+	}
+	//else if (event == EVENT_MOUSEMOVE)
+	//{
+	//	cout << "Mouse move over the window - position (" << x << ", " << y << ")" << endl;
 
+	//}
 }
