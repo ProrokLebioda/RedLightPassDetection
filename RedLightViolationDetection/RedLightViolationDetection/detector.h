@@ -26,9 +26,23 @@ private:
 	Mat frame, blob;
 	string outputFile;
 	string kWinName;
-	Rect2d myROI;
+	Rect2d carDetectionROI;
+	Rect2d trafficLightROI;
 	Mat croppedFrame;
+	Mat trafficLightFrame;
 
+	int iLowH;//Assumed low Hue for red
+	int iHighH;//Assumed high Hue for red
+
+	int iLowS;
+	int iHighS;
+
+	int iLowV;
+	int iHighV;
+
+	Mat frameThresholded;
+
+	bool isRedLight;
 	float confThreshold = 0.5; // Confidence threshold
 	float nmsThreshold = 0.4;  // Non-maximum suppression threshold
 	int inpWidth = 416;  // Width of network's input image
@@ -37,7 +51,7 @@ private:
 public:
 	Detector(string classesFile);
 
-	int detectorProgram(CommandLineParser parser);
+	int detectorProgram(CommandLineParser parser);//class execution
 	string loadClasses(string classesFile);
 	bool openVideoOrCam(CommandLineParser parser);
 	void loadNetwork();
@@ -45,7 +59,8 @@ public:
 	void detectionLoop();
 	// Remove the bounding boxes with low confidence using non-maxima suppression
 	void postprocess(Mat& frame, const vector<Mat>& out);
-
+	void setRedLightValues();
+	bool detectRedLight();
 	// Draw the predicted bounding box
 	void drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i);
 

@@ -14,6 +14,14 @@ Detector::Detector(string classesFile) :
 	inpWidth(416), inpHeight(416)
 {
 	classesLine = loadClasses(classesFile);
+	iLowH = 165;//Assumed low Hue for red
+	iHighH = 179;//Assumed high Hue for red
+
+	iLowS = 0;
+	iHighS = 255;
+
+	iLowV = 0;
+	iHighV = 255;
 }
 
 int Detector::detectorProgram(CommandLineParser parser)
@@ -105,23 +113,39 @@ void Detector::selectUserROI(bool &once)
 
 	if (!once)// Select ROI
 	{
-		myROI = selectROI(kWinName, frame);
-		croppedFrame = frame(myROI);
+		Mat frameTemp;
+		frame.copyTo(frameTemp);
+		putText(frameTemp, "Select car detection area", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
+		carDetectionROI = selectROI(kWinName, frameTemp);
+
+		frame.copyTo(frameTemp);
+		putText(frameTemp, "Select traffic light area", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
+		trafficLightROI = selectROI(kWinName, frameTemp);
+		croppedFrame = frame(carDetectionROI);
+		trafficLightFrame = frame(trafficLightROI);
+
 		once = true;
+
+		setRedLightValues();
 	}
 }
 
 void Detector::detectionLoop()
 {
 	bool once = false;
-	while (cv::waitKey(1) < 0)
+	while (waitKey(30)!=(int)('q'))
 	{
 		// get frame from the video
 		cap >> frame;
 		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
 		selectUserROI(once);
-
+		if (waitKey(30) == (int)('a'))
+			setRedLightValues();
+		if (detectRedLight())
+			putText(frame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
+		else
+			putText(frame, "Green light", Point(trafficLightROI.x+trafficLightFrame.cols+10, trafficLightROI.y + trafficLightFrame.rows/2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 255, 0), 5);
 		// Stop the program if we reached end of video
 		if (frame.empty())
 		{
@@ -131,7 +155,8 @@ void Detector::detectionLoop()
 			break;
 		}
 
-		cv::rectangle(frame, myROI, cv::Scalar(255, 0, 0));
+		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
+		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
 		blobFromImage(croppedFrame, blob, 1 / 255.0, cvSize(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
@@ -210,6 +235,80 @@ void Detector::postprocess(Mat& frame, const vector<Mat>& outs)
 		drawPred(classIds[idx], confidences[idx], box.x, box.y,
 			box.x + box.width, box.y + box.height, frame, i);
 	}
+}
+
+void Detector::setRedLightValues()
+{
+	//trafficLightROI
+	namedWindow("Control", WINDOW_NORMAL);
+
+	createTrackbar("LowH", "Control", &iLowH, 179);//Hue 0-179
+	createTrackbar("HighH", "Control", &iHighH, 179);
+
+	createTrackbar("LowS", "Control", &iLowS, 255);//Saturation 0-255
+	createTrackbar("HighS", "Control", &iHighS, 255);
+
+	createTrackbar("LowV", "Control", &iLowV, 255);//Value 0-255
+	createTrackbar("HighV", "Control", &iHighV, 255);
+
+	while (true)
+	{
+		Mat frameHSV;
+		cvtColor(trafficLightFrame, frameHSV, COLOR_BGR2HSV);
+		//Mat frameThresholded;
+		inRange(frameHSV, Scalar(iLowH, iLowS, iLowV), Scalar(iHighH, iHighS, iHighV), frameThresholded);
+
+		//morphological opening (remove small objects from the foreground)
+		erode(frameThresholded, frameThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
+		dilate(frameThresholded, frameThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
+
+		imshow("Thresholded Frame", frameThresholded);
+		imshow("Original Frame", trafficLightFrame);
+		if (waitKey(30) == 27)
+		{
+			cout << "ESC key is pressed by user" << endl;
+			break;
+		}
+	}
+}
+
+bool Detector::detectRedLight()
+{
+	int area=0;
+	int detectedHueCount=0;
+	double percentage=0.0;
+
+	trafficLightFrame = frame(trafficLightROI);
+	Mat frameHSV;
+	cvtColor(trafficLightFrame, frameHSV, COLOR_BGR2HSV);
+	//Mat frameThresholded;
+	inRange(frameHSV, Scalar(iLowH, iLowS, iLowV), Scalar(iHighH, iHighS, iHighV), frameThresholded);
+	//morphological opening (remove small objects from the foreground)
+	erode(frameThresholded, frameThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
+	dilate(frameThresholded, frameThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
+	for (int row = 0; row < frameThresholded.rows; row++)
+	{
+		for (int col= 0; col < frameThresholded.cols; col++)
+		{
+			uchar pixelGrayValue = frameThresholded.at<uchar>(row, col);
+			area++;
+			if (pixelGrayValue > 0)
+				detectedHueCount++;
+		}
+	}
+	if (detectedHueCount > 0)
+	{
+		percentage = (double)(detectedHueCount*100) / area;
+		if (percentage > 2.0)
+			return true;
+		else
+			return false;
+	}
+	else
+	{
+		return false;
+	}
+	
 }
 
 // Draw the predicted bounding box
