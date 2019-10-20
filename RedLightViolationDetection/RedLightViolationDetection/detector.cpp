@@ -133,6 +133,8 @@ void Detector::selectUserROI(bool &once)
 void Detector::detectionLoop()
 {
 	bool once = false;
+	vector<Mat> outsCopy;
+
 	while (waitKey(30)!=(int)('q'))
 	{
 		// get frame from the video
@@ -140,12 +142,13 @@ void Detector::detectionLoop()
 		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
 		selectUserROI(once);
-		if (waitKey(30) == (int)('a'))
+		if (waitKey(30) == (int)('l'))
 			setRedLightValues();
+
 		if (detectRedLight())
 			putText(frame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
 		else
-			putText(frame, "Green light", Point(trafficLightROI.x+trafficLightFrame.cols+10, trafficLightROI.y + trafficLightFrame.rows/2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 255, 0), 5);
+			putText(frame, "Not red light", Point(trafficLightROI.x+trafficLightFrame.cols+10, trafficLightROI.y + trafficLightFrame.rows/2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 255, 0), 5);
 		// Stop the program if we reached end of video
 		if (frame.empty())
 		{
@@ -266,6 +269,8 @@ void Detector::setRedLightValues()
 		imshow("Original Frame", trafficLightFrame);
 		if (waitKey(30) == 27)
 		{
+			setWindowProperty("Thresholded Frame", cv::WindowPropertyFlags::WND_PROP_VISIBLE, 0.0);
+			setWindowProperty("Original Frame", cv::WindowPropertyFlags::WND_PROP_VISIBLE, 0.0);
 			cout << "ESC key is pressed by user" << endl;
 			break;
 		}
