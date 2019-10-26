@@ -14,6 +14,6 @@ int main(int argc, char** argv)
 		parser.printMessage();
 		return 0;
 	}
-	Detector detector("data/yolo/coco.names");
+	MyDetector detector("data/yolo/coco.names");
 	return detector.detectorProgram(parser);
 }

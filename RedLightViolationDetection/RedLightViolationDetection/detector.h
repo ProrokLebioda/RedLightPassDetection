@@ -16,7 +16,7 @@ using namespace std;
 //function responsible for taking position of pass line
 void CallBackFunc(int event, int x, int y, int flags, void* userdata);
 
-class Detector
+class MyDetector
 {
 private:
 	string classesLine;
@@ -49,7 +49,7 @@ private:
 	int inpHeight = 416; // Height of network's input image
 	vector<string> classes;
 public:
-	Detector(string classesFile);
+	MyDetector(string classesFile);
 
 	int detectorProgram(CommandLineParser parser);//class execution
 	string loadClasses(string classesFile);

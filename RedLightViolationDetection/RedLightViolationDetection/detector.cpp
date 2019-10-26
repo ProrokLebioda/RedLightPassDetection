@@ -1,6 +1,7 @@
 
 #pragma once
 #include "detector.h"
+#include "opencv2/tracking/tracker.hpp"
 //#include "blob.h"
 //#include <conio.h>
 
@@ -9,7 +10,7 @@ int inX = 0, inY = 0;//starting position for pass line
 int outX = 0, outY = 0;//ending position for pass line
 bool endLine = false;
 
-Detector::Detector(string classesFile) :
+MyDetector::MyDetector(string classesFile) :
 	confThreshold(0.5), nmsThreshold(0.4),
 	inpWidth(416), inpHeight(416)
 {
@@ -24,7 +25,7 @@ Detector::Detector(string classesFile) :
 	iHighV = 255;
 }
 
-int Detector::detectorProgram(CommandLineParser parser)
+int MyDetector::detectorProgram(CommandLineParser parser)
 {
 	loadNetwork();
 
@@ -60,7 +61,7 @@ int Detector::detectorProgram(CommandLineParser parser)
 	return 0;
 }
 
-string Detector::loadClasses(string classesFile)
+string MyDetector::loadClasses(string classesFile)
 {
 	ifstream ifs(classesFile.c_str());
 	string line;
@@ -68,7 +69,7 @@ string Detector::loadClasses(string classesFile)
 	return line;
 }
 
-bool Detector::openVideoOrCam(CommandLineParser parser)
+bool MyDetector::openVideoOrCam(CommandLineParser parser)
 {
 	string str;
 	try {
@@ -96,7 +97,7 @@ bool Detector::openVideoOrCam(CommandLineParser parser)
 }
 
 
-void Detector::loadNetwork()
+void MyDetector::loadNetwork()
 {
 	// Give the configuration and weight files for the model
 	String modelConfiguration = "data/yolo/yolov3.cfg";
@@ -108,7 +109,7 @@ void Detector::loadNetwork()
 	net.setPreferableTarget(DNN_TARGET_OPENCL);
 }
 
-void Detector::selectUserROI(bool &once)
+void MyDetector::selectUserROI(bool &once)
 {
 
 	if (!once)// Select ROI
@@ -130,15 +131,17 @@ void Detector::selectUserROI(bool &once)
 	}
 }
 
-void Detector::detectionLoop()
+void MyDetector::detectionLoop()
 {
 	bool once = false;
 	vector<Mat> outsCopy;
-
+	Mat frameCopy;
+	MultiTracker multiTracker;
 	while (waitKey(30)!=(int)('q'))
 	{
 		// get frame from the video
 		cap >> frame;
+		frameCopy = frame;
 		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
 		selectUserROI(once);
@@ -160,7 +163,7 @@ void Detector::detectionLoop()
 
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
-		blobFromImage(croppedFrame, blob, 1 / 255.0, cvSize(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
+		blobFromImage(croppedFrame, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
 		net.setInput(blob);
@@ -189,7 +192,7 @@ void Detector::detectionLoop()
 }
 
 // Remove the bounding boxes with low confidence using non-maxima suppression
-void Detector::postprocess(Mat& frame, const vector<Mat>& outs)
+void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 {
 	vector<int> classIds;
 	vector<float> confidences;
@@ -240,7 +243,7 @@ void Detector::postprocess(Mat& frame, const vector<Mat>& outs)
 	}
 }
 
-void Detector::setRedLightValues()
+void MyDetector::setRedLightValues()
 {
 	//trafficLightROI
 	namedWindow("Control", WINDOW_NORMAL);
@@ -277,7 +280,7 @@ void Detector::setRedLightValues()
 	}
 }
 
-bool Detector::detectRedLight()
+bool MyDetector::detectRedLight()
 {
 	int area=0;
 	int detectedHueCount=0;
@@ -317,7 +320,7 @@ bool Detector::detectRedLight()
 }
 
 // Draw the predicted bounding box
-void Detector::drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i)
+void MyDetector::drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i)
 {
 	//Draw a rectangle displaying the bounding box
 	rectangle(frame, Point(left, top), Point(right, bottom), Scalar(255, 178, 50), 3);
@@ -340,7 +343,7 @@ void Detector::drawPred(int classId, float conf, int left, int top, int right, i
 }
 
 // Get the names of the output layers
-vector<String> Detector::getOutputsNames()
+vector<String> MyDetector::getOutputsNames()
 {
 	static vector<String> names;
 	if (names.empty())

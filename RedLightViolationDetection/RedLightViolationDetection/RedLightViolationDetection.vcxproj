@@ -145,15 +145,15 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>D:\opencv3\opencv\build\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\opencv411\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>opencv_world345.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>D:\opencv3\opencv\build\x64\vc14\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_core411.lib;opencv_aruco411.lib;opencv_bgsegm411.lib;opencv_bioinspired411.lib;opencv_calib3d411.lib;opencv_ccalib411.lib;opencv_datasets411.lib;opencv_dnn411.lib;opencv_dnn_objdetect411.lib;opencv_dnn_superres411.lib;opencv_dpm411.lib;opencv_face411.lib;opencv_features2d411.lib;opencv_flann411.lib;opencv_fuzzy411.lib;opencv_gapi411.lib;opencv_hfs411.lib;opencv_highgui411.lib;opencv_imgcodecs411.lib;opencv_imgproc411.lib;opencv_img_hash411.lib;opencv_line_descriptor411.lib;opencv_ml411.lib;opencv_objdetect411.lib;opencv_optflow411.lib;opencv_phase_unwrapping411.lib;opencv_photo411.lib;opencv_plot411.lib;opencv_quality411.lib;opencv_reg411.lib;opencv_saliency411.lib;opencv_shape411.lib;opencv_stereo411.lib;opencv_stitching411.lib;opencv_structured_light411.lib;opencv_superres411.lib;opencv_surface_matching411.lib;opencv_text411.lib;opencv_tracking411.lib;opencv_video411.lib;opencv_videoio411.lib;opencv_videostab411.lib;opencv_xfeatures2d411.lib;opencv_ximgproc411.lib;opencv_xobjdetect411.lib;opencv_xphoto411.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\opencv411\x64\vc16\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
