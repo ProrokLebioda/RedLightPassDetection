@@ -1,7 +1,6 @@
 
 #pragma once
-#include "detector.h"
-#include "opencv2/tracking/tracker.hpp"
+#include "mydetector.h"
 //#include "blob.h"
 //#include <conio.h>
 
@@ -9,6 +8,34 @@
 int inX = 0, inY = 0;//starting position for pass line
 int outX = 0, outY = 0;//ending position for pass line
 bool endLine = false;
+
+Ptr<Tracker> MyDetector::createTrackerByName(string trackerType)
+{
+	Ptr<Tracker> tracker;
+	if (trackerType == trackerTypes[0])
+		tracker = TrackerBoosting::create();
+	else if (trackerType == trackerTypes[1])
+		tracker = TrackerMIL::create();
+	else if (trackerType == trackerTypes[2])
+		tracker = TrackerKCF::create();
+	else if (trackerType == trackerTypes[3])
+		tracker = TrackerTLD::create();
+	else if (trackerType == trackerTypes[4])
+		tracker = TrackerMedianFlow::create();
+	else if (trackerType == trackerTypes[5])
+		tracker = TrackerGOTURN::create();
+	else if (trackerType == trackerTypes[6])
+		tracker = TrackerMOSSE::create();
+	else if (trackerType == trackerTypes[7])
+		tracker = TrackerCSRT::create();
+	else {
+		cout << "Incorrect tracker name" << endl;
+		cout << "Available trackers are: " << endl;
+		for (vector<string>::iterator it = trackerTypes.begin(); it != trackerTypes.end(); ++it)
+			std::cout << " " << *it << endl;
+	}
+	return tracker;
+}
 
 MyDetector::MyDetector(string classesFile) :
 	confThreshold(0.5), nmsThreshold(0.4),
@@ -136,7 +163,13 @@ void MyDetector::detectionLoop()
 	bool once = false;
 	vector<Mat> outsCopy;
 	Mat frameCopy;
-	MultiTracker multiTracker;
+
+	//
+	//MultiTracker multiTracker;
+	Ptr<MultiTracker> multiTracker = cv::MultiTracker::create();
+	vector<Rect> bboxes;
+	Rect2d carBox;
+
 	while (waitKey(30)!=(int)('q'))
 	{
 		// get frame from the video
@@ -147,6 +180,20 @@ void MyDetector::detectionLoop()
 		selectUserROI(once);
 		if (waitKey(30) == (int)('l'))
 			setRedLightValues();
+
+		if (waitKey(30) == (int)('t'))
+		{
+			Mat frameTemp;
+			frame.copyTo(frameTemp);
+			putText(frameTemp, "Select car for tracking", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
+			carBox = selectROI(kWinName, frameTemp);
+
+			// Specify the tracker type
+			string trackerType = "CSRT";
+		
+
+			multiTracker->add(createTrackerByName(trackerType), frame, carBox);
+		}
 
 		if (detectRedLight())
 			putText(frame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
@@ -161,26 +208,34 @@ void MyDetector::detectionLoop()
 			break;
 		}
 
+		multiTracker->update(frame);
+		// Draw tracked objects
+		for (unsigned i = 0; i < multiTracker->getObjects().size(); i++)
+		{
+			rectangle(frame, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), 2, 1);
+		}
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
+		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
+		
 		blobFromImage(croppedFrame, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
-		net.setInput(blob);
+		//net.setInput(blob);
 
 		// Runs the forward pass to get output of the output layers
 		vector<Mat> outs;
-		net.forward(outs, getOutputsNames());
+		//net.forward(outs, getOutputsNames());
 
 		// Remove the bounding boxes with low confidence
-		postprocess(croppedFrame, outs);
+		//postprocess(croppedFrame, outs);
 
 		// Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
 		vector<double> layersTimes;
-		double freq = getTickFrequency() / 1000;
-		double t = net.getPerfProfile(layersTimes) / freq;
-		string label = format("Inference time for a frame : %.2f ms", t);
-		putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+		//double freq = getTickFrequency() / 1000;
+		//double t = net.getPerfProfile(layersTimes) / freq;
+		//string label = format("Inference time for a frame : %.2f ms", t);
+		//putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 
 		// Write the frame with the detection boxes
 		frame.convertTo(frame, CV_8U);

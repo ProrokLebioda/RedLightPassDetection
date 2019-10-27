@@ -8,6 +8,8 @@
 #include <opencv2/dnn.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
+#include "opencv2/tracking/tracker.hpp"
+
 class Blob;
 using namespace cv;
 using namespace dnn;
@@ -15,6 +17,7 @@ using namespace std;
 
 //function responsible for taking position of pass line
 void CallBackFunc(int event, int x, int y, int flags, void* userdata);
+
 
 class MyDetector
 {
@@ -48,6 +51,10 @@ private:
 	int inpWidth = 416;  // Width of network's input image
 	int inpHeight = 416; // Height of network's input image
 	vector<string> classes;
+	vector<string> trackerTypes = { "BOOSTING", "MIL", "KCF", "TLD", "MEDIANFLOW", "GOTURN", "MOSSE", "CSRT" };
+
+
+	Ptr<Tracker> createTrackerByName(string trackerType);
 public:
 	MyDetector(string classesFile);
 

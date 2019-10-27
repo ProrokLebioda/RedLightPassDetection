@@ -18,10 +18,10 @@
     <ClInclude Include="blob.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="detector.h">
+    <ClInclude Include="RedLightViolationDetection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RedLightViolationDetection.h">
+    <ClInclude Include="mydetector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -32,7 +32,7 @@
     <ClCompile Include="blob.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="detector.cpp">
+    <ClCompile Include="mydetector.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
