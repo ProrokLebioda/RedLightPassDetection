@@ -222,6 +222,7 @@ void MyDetector::detectionLoop()
 		// Draw tracked objects
 		for (unsigned i = 0; i < multiTracker->getObjects().size(); i++)
 		{
+			
 			rectangle(frame, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), 2, 1);
 			rectangle(frameCopy, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), -2, 1);
 
