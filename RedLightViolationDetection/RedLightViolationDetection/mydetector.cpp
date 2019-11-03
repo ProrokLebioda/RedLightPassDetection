@@ -174,26 +174,36 @@ void MyDetector::detectionLoop()
 	{
 		// get frame from the video
 		cap >> frame;
-		frameCopy = frame;
+		frame.copyTo(frameCopy);
 		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
 		selectUserROI(once);
 		if (waitKey(30) == (int)('l'))
 			setRedLightValues();
 
-		if (waitKey(30) == (int)('t'))
-		{
-			Mat frameTemp;
-			frame.copyTo(frameTemp);
-			putText(frameTemp, "Select car for tracking", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
-			carBox = selectROI(kWinName, frameTemp);
+		//if (waitKey(30) == (int)('t'))
+		//{
+		//	if (outs.empty())
+		//	{
+		//		Mat frameTemp;
+		//		frame.copyTo(frameTemp);
+		//		putText(frameTemp, "Select car for tracking", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
+		//		carBox = selectROI(kWinName, frameTemp);
 
-			// Specify the tracker type
-			string trackerType = "CSRT";
-		
+		//		// Specify the tracker type
+		//		string trackerType = "CSRT";
 
-			multiTracker->add(createTrackerByName(trackerType), frame, carBox);
-		}
+		//		multiTracker->add(createTrackerByName(trackerType), frameCopy, carBox);
+		//	}
+		//	else
+			if (!outs.empty())
+			{
+				// Specify the tracker type
+				string trackerType = "CSRT";
+				for(Rect2d rect : trackingBoxes)
+					multiTracker->add(createTrackerByName(trackerType), frameCopy, rect);
+			}
+		//}
 
 		if (detectRedLight())
 			putText(frame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
@@ -213,29 +223,31 @@ void MyDetector::detectionLoop()
 		for (unsigned i = 0; i < multiTracker->getObjects().size(); i++)
 		{
 			rectangle(frame, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), 2, 1);
+			rectangle(frameCopy, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), -2, 1);
+
 		}
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
 		
-		blobFromImage(croppedFrame, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
+		blobFromImage(frameCopy, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
-		//net.setInput(blob);
+		net.setInput(blob);
 
 		// Runs the forward pass to get output of the output layers
-		vector<Mat> outs;
-		//net.forward(outs, getOutputsNames());
+		//vector<Mat> outs;
+		net.forward(outs, getOutputsNames());
 
 		// Remove the bounding boxes with low confidence
-		//postprocess(croppedFrame, outs);
+		postprocess(frame, outs);
 
 		// Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
 		vector<double> layersTimes;
-		//double freq = getTickFrequency() / 1000;
-		//double t = net.getPerfProfile(layersTimes) / freq;
-		//string label = format("Inference time for a frame : %.2f ms", t);
-		//putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+		double freq = getTickFrequency() / 1000;
+		double t = net.getPerfProfile(layersTimes) / freq;
+		string label = format("Inference time for a frame : %.2f ms", t);
+		putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 
 		// Write the frame with the detection boxes
 		frame.convertTo(frame, CV_8U);
@@ -252,7 +264,7 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 	vector<int> classIds;
 	vector<float> confidences;
 	vector<Rect> boxes;
-
+	trackingBoxes.clear();
 	for (size_t i = 0; i < outs.size(); ++i)
 	{
 		// Scan through all the bounding boxes output from the network and keep only the
@@ -281,6 +293,8 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				classIds.push_back(classIdPoint.x);
 				confidences.push_back((float)confidence);
 				boxes.push_back(Rect(left, top, width, height));
+				if (width>200&&height>200)
+					trackingBoxes.push_back(Rect(left, top, width, height));
 			}
 		}
 	}

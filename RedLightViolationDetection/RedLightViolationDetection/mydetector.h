@@ -33,6 +33,7 @@ private:
 	Rect2d trafficLightROI;
 	Mat croppedFrame;
 	Mat trafficLightFrame;
+	vector<Mat> outs;
 
 	int iLowH;//Assumed low Hue for red
 	int iHighH;//Assumed high Hue for red
@@ -52,7 +53,7 @@ private:
 	int inpHeight = 416; // Height of network's input image
 	vector<string> classes;
 	vector<string> trackerTypes = { "BOOSTING", "MIL", "KCF", "TLD", "MEDIANFLOW", "GOTURN", "MOSSE", "CSRT" };
-
+	vector<Rect> trackingBoxes;
 
 	Ptr<Tracker> createTrackerByName(string trackerType);
 public:
