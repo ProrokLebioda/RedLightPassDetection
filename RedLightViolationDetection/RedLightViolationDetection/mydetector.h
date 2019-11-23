@@ -27,6 +27,7 @@ private:
 	VideoCapture cap;
 	VideoWriter video;
 	Mat frame, blob;
+	Mat sceneMask;
 	string outputFile;
 	string kWinName;
 	Rect2d carDetectionROI;
@@ -34,7 +35,8 @@ private:
 	Mat croppedFrame;
 	Mat trafficLightFrame;
 	vector<Mat> outs;
-
+	Ptr<MultiTracker> multiTracker;
+	vector<Ptr<Tracker>> singleTrackers;
 	int iLowH;//Assumed low Hue for red
 	int iHighH;//Assumed high Hue for red
 
@@ -71,6 +73,8 @@ public:
 	bool detectRedLight();
 	// Draw the predicted bounding box
 	void drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i);
+
+	void updateTrackedObjects(Mat &frameCopy );
 
 	// Get the names of the output layers
 	vector<String> getOutputsNames();

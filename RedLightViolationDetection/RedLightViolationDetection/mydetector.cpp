@@ -41,6 +41,8 @@ MyDetector::MyDetector(string classesFile) :
 	confThreshold(0.5), nmsThreshold(0.4),
 	inpWidth(416), inpHeight(416)
 {
+	sceneMask = imread("data/image/00001mask.jpg");
+	multiTracker = cv::MultiTracker::create();
 	classesLine = loadClasses(classesFile);
 	iLowH = 165;//Assumed low Hue for red
 	iHighH = 179;//Assumed high Hue for red
@@ -138,11 +140,11 @@ void MyDetector::loadNetwork()
 
 void MyDetector::selectUserROI(bool &once)
 {
-
 	if (!once)// Select ROI
 	{
 		Mat frameTemp;
 		frame.copyTo(frameTemp);
+
 		putText(frameTemp, "Select car detection area", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
 		carDetectionROI = selectROI(kWinName, frameTemp);
 
@@ -161,15 +163,8 @@ void MyDetector::selectUserROI(bool &once)
 void MyDetector::detectionLoop()
 {
 	bool once = false;
-	vector<Mat> outsCopy;
 	Mat frameCopy;
-
-	//
-	//MultiTracker multiTracker;
-	Ptr<MultiTracker> multiTracker = cv::MultiTracker::create();
-	vector<Rect> bboxes;
-	Rect2d carBox;
-
+	
 	while (waitKey(30)!=(int)('q'))
 	{
 		// get frame from the video
@@ -181,28 +176,9 @@ void MyDetector::detectionLoop()
 		if (waitKey(30) == (int)('l'))
 			setRedLightValues();
 
-		//if (waitKey(30) == (int)('t'))
-		//{
-		//	if (outs.empty())
-		//	{
-		//		Mat frameTemp;
-		//		frame.copyTo(frameTemp);
-		//		putText(frameTemp, "Select car for tracking", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
-		//		carBox = selectROI(kWinName, frameTemp);
-
-		//		// Specify the tracker type
-		//		string trackerType = "CSRT";
-
-		//		multiTracker->add(createTrackerByName(trackerType), frameCopy, carBox);
-		//	}
-		//	else
-			if (!outs.empty())
-			{
-				// Specify the tracker type
-				string trackerType = "CSRT";
-				for(Rect2d rect : trackingBoxes)
-					multiTracker->add(createTrackerByName(trackerType), frameCopy, rect);
-			}
+		/*if (waitKey(30) == (int)('t'))
+		{*/
+			updateTrackedObjects(frameCopy);
 		//}
 
 		if (detectRedLight())
@@ -222,15 +198,21 @@ void MyDetector::detectionLoop()
 		// Draw tracked objects
 		for (unsigned i = 0; i < multiTracker->getObjects().size(); i++)
 		{
-			
-			rectangle(frame, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), 2, 1);
-			rectangle(frameCopy, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), -2, 1);
+			int centerX = multiTracker->getObjects()[i].x + multiTracker->getObjects()[i].width/2;
+			int centerY = multiTracker->getObjects()[i].y + multiTracker->getObjects()[i].height/2;
+			Point2d centerOfObjectToTrack(centerX, centerY);
+			if (carDetectionROI.contains(centerOfObjectToTrack))
+			{
+				rectangle(frame, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), 2, 1);//paint only when in car carDetectionROI
+			}
+
+			rectangle(frameCopy, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
 
 		}
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
-		
+		frameCopy = frameCopy & sceneMask;
 		blobFromImage(frameCopy, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
@@ -294,7 +276,9 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				classIds.push_back(classIdPoint.x);
 				confidences.push_back((float)confidence);
 				boxes.push_back(Rect(left, top, width, height));
-				if (width>200&&height>200)
+				Point2d centerOfObjectToTrack(centerX,centerY);
+				//if (width>200&&height>200)
+				if (carDetectionROI.contains(centerOfObjectToTrack))
 					trackingBoxes.push_back(Rect(left, top, width, height));
 			}
 		}
@@ -376,7 +360,7 @@ bool MyDetector::detectRedLight()
 	}
 	if (detectedHueCount > 0)
 	{
-		percentage = (double)(detectedHueCount*100) / area;
+		percentage = ((double)detectedHueCount*100) / area;
 		if (percentage > 2.0)
 			return true;
 		else
@@ -410,6 +394,34 @@ void MyDetector::drawPred(int classId, float conf, int left, int top, int right,
 	rectangle(frame, Point(left, top - round(1.5*labelSize.height)), Point(left + round(1.5*labelSize.width), top + baseLine), Scalar(255, 255, 255), FILLED);
 	putText(frame, to_string(classId), Point(left, top - ((top - bottom) / 2)), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0, 0, 255), 1);
 	putText(frame, label, Point(left, top), FONT_HERSHEY_SIMPLEX, 0.75, Scalar(0, 0, 0), 1);
+}
+
+void MyDetector::updateTrackedObjects(Mat &frameCopy)
+{
+	if (trackingBoxes.empty())
+	{
+		//Rect2d carBox;
+		//Mat frameTemp;
+		//frame.copyTo(frameTemp);
+		//putText(frameTemp, "Select car for tracking", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
+		//carBox = selectROI(kWinName, frameTemp);
+
+		//// Specify the tracker type
+		//string trackerType = "CSRT";
+
+		//multiTracker->add(createTrackerByName(trackerType), frameCopy, carBox);
+	}
+	else
+	{
+		
+
+		// Specify the tracker type
+		string trackerType = "CSRT";
+		for (Rect2d rect : trackingBoxes)
+		{
+			multiTracker->add(createTrackerByName(trackerType), frameCopy, rect);;
+		}
+	}
 }
 
 // Get the names of the output layers
