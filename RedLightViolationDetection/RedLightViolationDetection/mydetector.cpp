@@ -42,7 +42,7 @@ MyDetector::MyDetector(string classesFile) :
 	inpWidth(416), inpHeight(416)
 {
 	sceneMask = imread("data/image/00001mask.jpg");
-	multiTracker = cv::MultiTracker::create();
+	//multiTracker = cv::MultiTracker::create();
 	classesLine = loadClasses(classesFile);
 	iLowH = 165;//Assumed low Hue for red
 	iHighH = 179;//Assumed high Hue for red
@@ -194,21 +194,59 @@ void MyDetector::detectionLoop()
 			break;
 		}
 
-		multiTracker->update(frame);
+		//multiTracker->update(frame);
 		// Draw tracked objects
-		for (unsigned i = 0; i < multiTracker->getObjects().size(); i++)
+		if (!singleTrackers.empty())
 		{
-			int centerX = multiTracker->getObjects()[i].x + multiTracker->getObjects()[i].width/2;
-			int centerY = multiTracker->getObjects()[i].y + multiTracker->getObjects()[i].height/2;
-			Point2d centerOfObjectToTrack(centerX, centerY);
-			if (carDetectionROI.contains(centerOfObjectToTrack))
+			list<Ptr<Tracker>>::iterator itTracker;
+			list<Rect2d>::iterator itTrackerBB;
+			itTracker = singleTrackers.begin();
+			//itTrackerBB = singleTrackersBB.begin();
+			for (int i = 0; i < singleTrackers.size();i++)
 			{
-				rectangle(frame, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), 2, 1);//paint only when in car carDetectionROI
+				itTracker = next(singleTrackers.begin(), i);
+				//itTrackerBB= next(singleTrackersBB.begin(), i);
+				Ptr<Tracker> tracker = *itTracker;
+				Rect2d rect;
+				tracker->update(frame, rect);
+				//singleTrackersBB.push_back(rect);
+				
+				
+				int centerX = rect.x + rect.width/2;
+				int centerY = rect.y + rect.height/2;
+				Point2d centerOfObjectToTrack(centerX, centerY);
+				
+				//if (carDetectionROI.contains(centerOfObjectToTrack))
+				if (((carDetectionROI.x+carDetectionROI.width)>centerOfObjectToTrack.x)&&( carDetectionROI.x < centerOfObjectToTrack.x))
+				{
+					
+					rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
+					string label = format("No: %d", i);
+					putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));					rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
+				}
+				else
+				{
+					//singleTrackersBB.erase(itTrackerBB);
+					singleTrackers.erase(itTracker);
+				}
+				/*++itTracker;
+				++itTrackerBB;*/
 			}
-
-			rectangle(frameCopy, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
-
 		}
+		//for (unsigned i = 0; i < multiTracker->getObjects().size(); i++)
+		//{
+		//	int centerX = multiTracker->getObjects()[i].x + multiTracker->getObjects()[i].width/2;
+		//	int centerY = multiTracker->getObjects()[i].y + multiTracker->getObjects()[i].height/2;
+		//	Point2d centerOfObjectToTrack(centerX, centerY);
+		//	if (carDetectionROI.contains(centerOfObjectToTrack))
+		//	{
+		//		multiTracker.
+		//		rectangle(frame, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), 2, 1);//paint only when in car carDetectionROI
+		//	}
+
+		//	rectangle(frameCopy, multiTracker->getObjects()[i], cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
+
+		//}
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
@@ -278,7 +316,7 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				boxes.push_back(Rect(left, top, width, height));
 				Point2d centerOfObjectToTrack(centerX,centerY);
 				//if (width>200&&height>200)
-				if (carDetectionROI.contains(centerOfObjectToTrack))
+				if (carDetectionROI.contains(centerOfObjectToTrack)&& ((left >= carDetectionROI.x)))
 					trackingBoxes.push_back(Rect(left, top, width, height));
 			}
 		}
@@ -416,10 +454,13 @@ void MyDetector::updateTrackedObjects(Mat &frameCopy)
 		
 
 		// Specify the tracker type
-		string trackerType = "CSRT";
+		string trackerType = "KCF";
 		for (Rect2d rect : trackingBoxes)
 		{
-			multiTracker->add(createTrackerByName(trackerType), frameCopy, rect);;
+			Ptr<TrackerKCF> trackerKCF = TrackerKCF::create();
+			trackerKCF->init(frameCopy, rect);
+			singleTrackers.push_back(trackerKCF);
+			//singleTrackersBB.push_back(rect);
 		}
 	}
 }

@@ -36,7 +36,9 @@ private:
 	Mat trafficLightFrame;
 	vector<Mat> outs;
 	Ptr<MultiTracker> multiTracker;
-	vector<Ptr<Tracker>> singleTrackers;
+	list<Ptr<Tracker>> singleTrackers;
+	list<Rect2d> singleTrackersBB;
+
 	int iLowH;//Assumed low Hue for red
 	int iHighH;//Assumed high Hue for red
 
