@@ -37,7 +37,7 @@ private:
 	vector<Mat> outs;
 	Ptr<MultiTracker> multiTracker;
 	list<Ptr<Tracker>> singleTrackers;
-	list<Rect2d> singleTrackersBB;
+	list<vector<Point2d>> listOfVectorsOfPointsForTrackers;
 
 	int iLowH;//Assumed low Hue for red
 	int iHighH;//Assumed high Hue for red
