@@ -225,14 +225,16 @@ void MyDetector::detectionLoop()
 
 					if (!itListOfVectorsOfPointsForTrackers->empty())
 					{
+						itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
 						vector<Point2d> points = *itListOfVectorsOfPointsForTrackers;
-						points.push_back(centerOfObjectToTrack);
+						//points.push_back(centerOfObjectToTrack);
+
 						if (!points.empty())
 						{
 							Scalar color(0, 0, 255);
 							for (int i = 0; i < points.size() - 1; i++)
 							{
-								line(frame, points[i], points[i + 1], color);
+								cv::line(frame, points[i], points[i + 1], color);
 							}
 						}
 					}
