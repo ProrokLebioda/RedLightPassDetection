@@ -212,7 +212,7 @@ void MyDetector::detectionLoop()
 				itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
 
 				int centerX = rect.x + rect.width/2;
-				int centerY = rect.y + rect.height/2;
+				int centerY = rect.y + rect.height;
 				Point2d centerOfObjectToTrack(centerX, centerY);
 				
 				if (((carDetectionROI.x+carDetectionROI.width)>centerOfObjectToTrack.x)&&( carDetectionROI.x < centerOfObjectToTrack.x))
@@ -227,7 +227,6 @@ void MyDetector::detectionLoop()
 					{
 						itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
 						vector<Point2d> points = *itListOfVectorsOfPointsForTrackers;
-						//points.push_back(centerOfObjectToTrack);
 
 						if (!points.empty())
 						{
@@ -457,7 +456,7 @@ void MyDetector::updateTrackedObjects(Mat &frameCopy)
 		{
 
 			int centerX = rect.x + rect.width / 2;
-			int centerY = rect.y + rect.height / 2;
+			int centerY = rect.y + rect.height;
 			Point2d centerOfObjectToTrack(centerX, centerY);
 
 			Ptr<TrackerKCF> trackerKCF = TrackerKCF::create();
