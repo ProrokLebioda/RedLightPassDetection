@@ -37,9 +37,48 @@ Ptr<Tracker> MyDetector::createTrackerByName(string trackerType)
 	return tracker;
 }
 
+bool MyDetector::isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2)
+{
+	//Point2f x = o2 - o1;
+	//Point2f d1 = p1 - o1;
+	//Point2f d2 = p2 - o2;
+	
+	//double cross = d1.x * d2.y - d1.y * d2.x;
+	//if (std::abs(cross) < /*EPS*/1e-8)
+	//	return false;
+	float ixOut;
+	float iyOut;
+
+	float detL1 = Det(o1.x, o1.y, p1.x, p1.y);
+	float detL2 = Det(o2.x, o2.y, p2.x, p2.y);
+	
+	float x1mx2 = o1.x - p1.x;
+	float x3mx4 = o2.x - p2.x;
+	float y1my2 = o1.y - p1.y;
+	float y3my4 = o2.y - p2.y;
+
+	float xnom = Det(detL1, x1mx2, detL2, x3mx4);
+	float ynom = Det(detL1, y1my2, detL2, y3my4);
+	float denom = Det(x1mx2, y1my2, x3mx4, y3my4);
+	if (denom == 0.0)//Lines don't seem to cross
+	{
+		ixOut = NAN;
+		iyOut = NAN;
+		return false;
+	}
+
+	ixOut = xnom / denom;
+	iyOut = ynom / denom;
+	if (!isfinite(ixOut) || !isfinite(iyOut)) //Probably a numerical issue
+		return false;
+
+	return true; //All OK
+}
+
 MyDetector::MyDetector(string classesFile) :
 	confThreshold(0.5), nmsThreshold(0.4),
-	inpWidth(416), inpHeight(416)
+	inpWidth(416), inpHeight(416),
+	detectedPasses(0)
 {
 	sceneMask = imread("data/image/00001mask.jpg");
 	//multiTracker = cv::MultiTracker::create();
@@ -52,6 +91,7 @@ MyDetector::MyDetector(string classesFile) :
 
 	iLowV = 0;
 	iHighV = 255;
+	toSkip.clear();
 }
 
 int MyDetector::detectorProgram(CommandLineParser parser)
@@ -200,8 +240,11 @@ void MyDetector::detectionLoop()
 			list<Ptr<Tracker>>::iterator itTracker;
 			itTracker = singleTrackers.begin();
 
-			list<vector<Point2d>>::iterator itListOfVectorsOfPointsForTrackers;
+			list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
 			itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
+
+			list<bool>::iterator itToSkip;
+			itToSkip = toSkip.begin();
 			for (int i = 0; i < singleTrackers.size();i++)
 			{
 				itTracker = next(singleTrackers.begin(), i);
@@ -211,29 +254,45 @@ void MyDetector::detectionLoop()
 				
 				itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
 
+				itToSkip = next(toSkip.begin(), i);
+
 				int centerX = rect.x + rect.width/2;
 				int centerY = rect.y + rect.height;
-				Point2d centerOfObjectToTrack(centerX, centerY);
+				Point2f centerOfObjectToTrack(centerX, centerY);
 				
 				if (((carDetectionROI.x+carDetectionROI.width)>centerOfObjectToTrack.x)&&( carDetectionROI.x < centerOfObjectToTrack.x))
 				{
 					
 					rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
 					string label = format("No: %d", i);
-					putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+					cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 					rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
 
 					if (!itListOfVectorsOfPointsForTrackers->empty())
 					{
 						itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
-						vector<Point2d> points = *itListOfVectorsOfPointsForTrackers;
+						vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
 
 						if (!points.empty())
 						{
 							Scalar color(0, 0, 255);
-							for (int i = 0; i < points.size() - 1; i++)
+							for (int j = 0; j < points.size() - 1; j++)
 							{
-								cv::line(frame, points[i], points[i + 1], color);
+								cv::line(frame, points[j], points[j + 1], color);
+								// add to detected
+								Point2f lineO(inX, inY);
+								Point2f lineP(outX, outY);
+								if (*itToSkip != true)
+								{
+									Point2f movementO(points[j].x, points[j].y);
+									Point2f movementP(points[j + 1].x, points[j + 1].y);
+
+									if (isIntersecting(lineO, lineP, movementO, movementP))
+									{
+										detectedPasses++;
+										*itToSkip = true;
+									}
+								}
 							}
 						}
 					}
@@ -242,19 +301,7 @@ void MyDetector::detectionLoop()
 				{
 					singleTrackers.erase(itTracker);
 					listOfVectorsOfPointsForTrackers.erase(itListOfVectorsOfPointsForTrackers);
-					/*if (!itListOfVectorsOfPointsForTrackers->empty())
-					{
-						itListOfVectorsOfPointsForTrackers->clear();
-						vector<Point2d> points = *itListOfVectorsOfPointsForTrackers;
-						if (!points.empty())
-						{
-							Scalar color(0, 0, 255);
-							for (int i = 0; i < points.size() - 1; i++)
-							{
-								line(frame, points[i], points[i + 1], color);
-							}
-						}
-					}*/
+					toSkip.erase(itToSkip);
 				}
 			}
 		}
@@ -281,6 +328,8 @@ void MyDetector::detectionLoop()
 		double t = net.getPerfProfile(layersTimes) / freq;
 		string label = format("Inference time for a frame : %.2f ms", t);
 		putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+		label = format("Detected passes: %d", detectedPasses);
+		putText(frame,label,Point(frame.cols-200, 15),FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 
 		// Write the frame with the detection boxes
 		frame.convertTo(frame, CV_8U);
@@ -326,7 +375,7 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				classIds.push_back(classIdPoint.x);
 				confidences.push_back((float)confidence);
 				boxes.push_back(Rect(left, top, width, height));
-				Point2d centerOfObjectToTrack(centerX,centerY);
+				Point2f centerOfObjectToTrack(centerX,centerY);
 				//if (width>200&&height>200)
 				if (carDetectionROI.contains(centerOfObjectToTrack)&& ((left >= carDetectionROI.x)))
 					trackingBoxes.push_back(Rect(left, top, width, height));
@@ -457,14 +506,15 @@ void MyDetector::updateTrackedObjects(Mat &frameCopy)
 
 			int centerX = rect.x + rect.width / 2;
 			int centerY = rect.y + rect.height;
-			Point2d centerOfObjectToTrack(centerX, centerY);
+			Point2f centerOfObjectToTrack(centerX, centerY);
 
 			Ptr<TrackerKCF> trackerKCF = TrackerKCF::create();
 			trackerKCF->init(frameCopy, rect);
 			singleTrackers.push_back(trackerKCF);
-			vector<Point2d> pointsForTracker;
+			vector<Point2f> pointsForTracker;
 			pointsForTracker.push_back(centerOfObjectToTrack);
 			listOfVectorsOfPointsForTrackers.push_back(pointsForTracker);
+			toSkip.push_back(false);
 		}
 	}
 }

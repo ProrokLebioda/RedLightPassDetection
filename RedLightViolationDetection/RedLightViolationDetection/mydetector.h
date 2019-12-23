@@ -3,12 +3,14 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <cmath>
 
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include "opencv2/tracking/tracker.hpp"
+
 
 class Blob;
 using namespace cv;
@@ -18,6 +20,10 @@ using namespace std;
 //function responsible for taking position of pass line
 void CallBackFunc(int event, int x, int y, int flags, void* userdata);
 
+inline double Det(double a, double b, double c, double d)
+{
+	return a * d - b * c;
+}
 
 class MyDetector
 {
@@ -37,7 +43,9 @@ private:
 	vector<Mat> outs;
 	Ptr<MultiTracker> multiTracker;
 	list<Ptr<Tracker>> singleTrackers;
-	list<vector<Point2d>> listOfVectorsOfPointsForTrackers;
+	list<vector<Point2f>> listOfVectorsOfPointsForTrackers;
+
+	int detectedPasses;
 
 	int iLowH;//Assumed low Hue for red
 	int iHighH;//Assumed high Hue for red
@@ -60,6 +68,9 @@ private:
 	vector<Rect> trackingBoxes;
 
 	Ptr<Tracker> createTrackerByName(string trackerType);
+
+	bool isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2);
+	list<bool> toSkip;
 public:
 	MyDetector(string classesFile);
 
