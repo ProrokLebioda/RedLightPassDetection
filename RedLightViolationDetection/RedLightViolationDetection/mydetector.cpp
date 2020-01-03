@@ -9,6 +9,65 @@ int inX = 0, inY = 0;//starting position for pass line
 int outX = 0, outY = 0;//ending position for pass line
 bool endLine = false;
 
+// Given three colinear points p, q, r, the function checks if 
+// point q lies on line segment 'pr' 
+bool onSegment(Point2f p, Point2f q, Point2f r)
+{
+	if (q.x <= max(p.x, r.x) && q.x >= min(p.x, r.x) &&
+		q.y <= max(p.y, r.y) && q.y >= min(p.y, r.y))
+		return true;
+
+	return false;
+}
+
+// To find orientation of ordered triplet (p, q, r). 
+// The function returns following values 
+// 0 --> p, q and r are colinear 
+// 1 --> Clockwise 
+// 2 --> Counterclockwise 
+int orientation(Point2f p, Point2f q, Point2f r)
+{
+	// See https://www.geeksforgeeks.org/orientation-3-ordered-points/ 
+	// for details of below formula. 
+	int val = (q.y - p.y) * (r.x - q.x) -
+		(q.x - p.x) * (r.y - q.y);
+
+	if (val == 0) return 0;  // colinear 
+
+	return (val > 0) ? 1 : 2; // clock or counterclock wise 
+}
+
+// The main function that returns true if line segment 'p1q1' 
+// and 'p2q2' intersect. 
+bool doIntersect(Point2f p1, Point2f q1, Point2f p2, Point2f q2)
+{
+	// Find the four orientations needed for general and 
+	// special cases 
+	int o1 = orientation(p1, q1, p2);
+	int o2 = orientation(p1, q1, q2);
+	int o3 = orientation(p2, q2, p1);
+	int o4 = orientation(p2, q2, q1);
+
+	// General case 
+	if (o1 != o2 && o3 != o4)
+		return true;
+
+	// Special Cases 
+	// p1, q1 and p2 are colinear and p2 lies on segment p1q1 
+	if (o1 == 0 && onSegment(p1, p2, q1)) return true;
+
+	// p1, q1 and q2 are colinear and q2 lies on segment p1q1 
+	if (o2 == 0 && onSegment(p1, q2, q1)) return true;
+
+	// p2, q2 and p1 are colinear and p1 lies on segment p2q2 
+	if (o3 == 0 && onSegment(p2, p1, q2)) return true;
+
+	// p2, q2 and q1 are colinear and q1 lies on segment p2q2 
+	if (o4 == 0 && onSegment(p2, q1, q2)) return true;
+
+	return false; // Doesn't fall in any of the above cases 
+}
+
 Ptr<Tracker> MyDetector::createTrackerByName(string trackerType)
 {
 	Ptr<Tracker> tracker;
@@ -80,6 +139,11 @@ MyDetector::MyDetector(string classesFile) :
 	inpWidth(416), inpHeight(416),
 	detectedPasses(0)
 {
+	outsPrevious.clear();
+	outs.clear();
+	boxesNew.clear();
+	boxesOld.clear();
+
 	sceneMask = imread("data/image/00001mask.jpg");
 	//multiTracker = cv::MultiTracker::create();
 	classesLine = loadClasses(classesFile);
@@ -218,7 +282,7 @@ void MyDetector::detectionLoop()
 
 		/*if (waitKey(30) == (int)('t'))
 		{*/
-			updateTrackedObjects(frameCopy);
+			//updateTrackedObjects(frameCopy);
 		//}
 
 		if (detectRedLight())
@@ -235,77 +299,78 @@ void MyDetector::detectionLoop()
 		}
 
 		// Draw tracked objects
-		if (!singleTrackers.empty())
-		{
-			list<Ptr<Tracker>>::iterator itTracker;
-			itTracker = singleTrackers.begin();
+		//if (!singleTrackers.empty())
+		//{
+		//	list<Ptr<Tracker>>::iterator itTracker;
+		//	itTracker = singleTrackers.begin();
 
-			list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
-			itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
+		//	list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
+		//	itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
 
-			list<bool>::iterator itToSkip;
-			itToSkip = toSkip.begin();
-			for (int i = 0; i < singleTrackers.size();i++)
-			{
-				itTracker = next(singleTrackers.begin(), i);
-				Ptr<Tracker> tracker = *itTracker;
-				Rect2d rect;
-				tracker->update(frame, rect);				 
-				
-				itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
+		//	list<bool>::iterator itToSkip;
+		//	itToSkip = toSkip.begin();
+		//	for (int i = 0; i < singleTrackers.size();i++)
+		//	{
+		//		itTracker = next(singleTrackers.begin(), i);
+		//		Ptr<Tracker> tracker = *itTracker;
+		//		Rect2d rect;
+		//		tracker->update(frame, rect);				 
+		//		
+		//		itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
 
-				itToSkip = next(toSkip.begin(), i);
+		//		itToSkip = next(toSkip.begin(), i);
 
-				int centerX = rect.x + rect.width/2;
-				int centerY = rect.y + rect.height;
-				Point2f centerOfObjectToTrack(centerX, centerY);
-				
-				if (((carDetectionROI.x+carDetectionROI.width)>centerOfObjectToTrack.x)&&( carDetectionROI.x < centerOfObjectToTrack.x))
-				{
-					
-					rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
-					string label = format("No: %d", i);
-					cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
-					rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
+		//		int centerX = rect.x + rect.width/2;
+		//		int centerY = rect.y + rect.height;
+		//		Point2f centerOfObjectToTrack(centerX, centerY);
+		//		
+		//		if (((carDetectionROI.x+carDetectionROI.width)>centerOfObjectToTrack.x)&&( carDetectionROI.x < centerOfObjectToTrack.x))
+		//		{
+		//			
+		//			rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
+		//			string label = format("No: %d", i);
+		//			cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+		//			rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
 
-					if (!itListOfVectorsOfPointsForTrackers->empty())
-					{
-						itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
-						vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
+		//			if (!itListOfVectorsOfPointsForTrackers->empty())
+		//			{
+		//				itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
+		//				vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
 
-						if (!points.empty())
-						{
-							Scalar color(0, 0, 255);
-							for (int j = 0; j < points.size() - 1; j++)
-							{
-								cv::line(frame, points[j], points[j + 1], color);
-								// add to detected
-								Point2f lineO(inX, inY);
-								Point2f lineP(outX, outY);
-								if (*itToSkip != true)
-								{
-									Point2f movementO(points[j].x, points[j].y);
-									Point2f movementP(points[j + 1].x, points[j + 1].y);
+		//				if (!points.empty())
+		//				{
+		//					Scalar color(0, 0, 255);
+		//					for (int j = 0; j < points.size() - 1; j++)
+		//					{
+		//						cv::line(frame, points[j], points[j + 1], color);
+		//						// add to detected
+		//						Point2f lineO(inX, inY);
+		//						Point2f lineP(outX, outY);
+		//						if (*itToSkip != true)
+		//						{
+		//							Point2f movementO(points[j].x, points[j].y);
+		//							Point2f movementP(points[j + 1].x, points[j + 1].y);
 
-									if (isIntersecting(lineO, lineP, movementO, movementP))
-									{
-										detectedPasses++;
-										*itToSkip = true;
-									}
-								}
-							}
-						}
-					}
-				}
-				else
-				{
-					singleTrackers.erase(itTracker);
-					listOfVectorsOfPointsForTrackers.erase(itListOfVectorsOfPointsForTrackers);
-					toSkip.erase(itToSkip);
-				}
-			}
-		}
+		//							if (isIntersecting(lineO, lineP, movementO, movementP))
+		//							{
+		//								detectedPasses++;
+		//								*itToSkip = true;
+		//							}
+		//						}
+		//					}
+		//				}
+		//			}
+		//		}
+		//		else
+		//		{
+		//			singleTrackers.erase(itTracker);
+		//			listOfVectorsOfPointsForTrackers.erase(itListOfVectorsOfPointsForTrackers);
+		//			toSkip.erase(itToSkip);
+		//		}
+		//	}
+		//}
 	
+
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
@@ -315,8 +380,15 @@ void MyDetector::detectionLoop()
 		//Sets the input to the network
 		net.setInput(blob);
 
+		
+
 		// Runs the forward pass to get output of the output layers
 		//vector<Mat> outs;
+		outsPrevious = outs;
+		if (!boxesNew.empty())
+		{
+			boxesOld = boxesNew;
+		}
 		net.forward(outs, getOutputsNames());
 
 		// Remove the bounding boxes with low confidence
@@ -340,13 +412,24 @@ void MyDetector::detectionLoop()
 	}
 }
 
+static float distanceBetweenPoints(Point2f p1, Point2f p2);
+static float distanceBetweenPoints(Point2f p1, Point2f p2)
+{
+	float distance;
+	float dx = p2.x - p1.x;
+
+	float dy = p2.y - p1.y;
+	distance = sqrt((double)dx * dx + dy * dy);
+	return distance;
+}
+
 // Remove the bounding boxes with low confidence using non-maxima suppression
 void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 {
 	vector<int> classIds;
 	vector<float> confidences;
 	vector<Rect> boxes;
-	trackingBoxes.clear();
+	//trackingBoxes.clear();
 	for (size_t i = 0; i < outs.size(); ++i)
 	{
 		// Scan through all the bounding boxes output from the network and keep only the
@@ -376,17 +459,63 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				confidences.push_back((float)confidence);
 				boxes.push_back(Rect(left, top, width, height));
 				Point2f centerOfObjectToTrack(centerX,centerY);
+				vector<Point2f> pointsForTracker;
+				pointsForTracker.push_back(centerOfObjectToTrack);
+
+
+				//listOfVectorsOfPointsForTrackers.push_back(pointsForTracker);
 				//if (width>200&&height>200)
-				if (carDetectionROI.contains(centerOfObjectToTrack)&& ((left >= carDetectionROI.x)))
-					trackingBoxes.push_back(Rect(left, top, width, height));
+				/*if (carDetectionROI.contains(centerOfObjectToTrack)&& ((left >= carDetectionROI.x)))
+					trackingBoxes.push_back(Rect(left, top, width, height));*/
 			}
 		}
 	}
+
 
 	// Perform non maximum suppression to eliminate redundant overlapping boxes with
 	// lower confidences
 	vector<int> indices;
 	NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
+	boxesNew.clear();
+	boxesNew = boxes;
+
+	if (!indices.empty())
+	{
+		for (int index : indices)
+		{
+			printf("[Index: %d]\n", index);
+		}
+	}
+	if (!boxesNew.empty() && !boxesOld.empty())
+	{
+		for (Rect boxOld : boxesOld)
+		{
+			Point2f oldCentre = Point2f(boxOld.x + boxOld.width / 2, boxOld.y + boxOld.height);
+			Point2f min;
+			float minDistance=99999.0;
+
+			for (Rect boxNew : boxesNew)
+			{
+				Point2f newCentre = Point2f(boxNew.x + boxNew.width / 2, boxNew.y + boxNew.height);
+				float tempDistance = distanceBetweenPoints(oldCentre, newCentre);
+				
+				printf("Temp distance: %f; MinDistance: %f \n", tempDistance, minDistance);
+				if (tempDistance<50.0 && tempDistance < minDistance )
+				{
+					min = newCentre;
+					minDistance = tempDistance;
+				}
+			}
+			if (min.x > 0.0 && min.y > 0.0)
+			{
+				std::vector<Point2f> vect;
+				vect.push_back(oldCentre);
+				vect.push_back(min);
+				listOfVectorsOfPointsForTrackers.push_back(vect);
+			}
+		}
+	}
+
 	for (size_t i = 0; i < indices.size(); ++i)
 	{
 		int idx = indices[i];
@@ -394,6 +523,71 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 		drawPred(classIds[idx], confidences[idx], box.x, box.y,
 			box.x + box.width, box.y + box.height, frame, i);
 	}
+
+	list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
+	itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
+
+	for (int i = 0; i < listOfVectorsOfPointsForTrackers.size(); i++)
+	{
+		bool isRepeated = false;
+		printf("listOfVectorsOfPointsForTrackers.size(): %d\n",listOfVectorsOfPointsForTrackers.size());
+
+		itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
+
+
+		if (!itListOfVectorsOfPointsForTrackers->empty())
+		{
+			vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
+
+			if (!points.empty())
+			{
+				for (int j = 0; j < i; j++)
+				{
+					itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), j);
+					vector<Point2f> pointsJ = *itListOfVectorsOfPointsForTrackers;
+					if ((pointsJ[0].x == points[0].x) || (pointsJ[0].y == points[0].y) || (pointsJ[1].x == points[1].x) || (pointsJ[1].y == points[1].y))
+					{
+						isRepeated = true;
+						break;
+					}
+				}
+
+				if (isRepeated)
+					continue;
+
+
+				Scalar color(0, 0, 255);
+				/*for (int j = 0; j < points.size() - 1; j++)
+				{*/
+					cv::line(frame, points[0], points[1], color);
+					// add to detected
+					Point2f lineO(inX, inY);
+					Point2f lineP(outX, outY);
+					/*if (*itToSkip != true)
+					{*/
+						Point2f movementO(points[0].x, points[0].y);
+						Point2f movementP(points[1].x, points[1].y);
+						bool isIntersect = doIntersect(lineO, lineP, movementO, movementP);
+						printf("================================================\n");
+						printf("I: %d	J: %d", i,0);
+						printf("LineO(%f,%f) ", lineO.x, lineO.y);
+						printf("LineP(%f,%f) \n", lineP.x, lineP.y);
+						printf("MovementO(%f,%f) ", movementO.x, movementO.y);
+						printf("MovementP(%f,%f) \n", movementP.x, movementP.y);
+						printf("Points intersect: %d\n", isIntersect);
+						printf("++++++++++++++++++++++++++++++++++++++++++++++++\n");
+
+						if (isIntersect)
+						{
+							detectedPasses++;
+							//*itToSkip = true;
+						}
+					//}
+				//}
+			}
+		}
+	}
+	listOfVectorsOfPointsForTrackers.clear();
 }
 
 void MyDetector::setRedLightValues()

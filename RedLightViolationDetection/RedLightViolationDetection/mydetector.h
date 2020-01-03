@@ -41,6 +41,9 @@ private:
 	Mat croppedFrame;
 	Mat trafficLightFrame;
 	vector<Mat> outs;
+	vector<Mat> outsPrevious;
+	vector<Rect> boxesNew;
+	vector<Rect> boxesOld;
 	Ptr<MultiTracker> multiTracker;
 	list<Ptr<Tracker>> singleTrackers;
 	list<vector<Point2f>> listOfVectorsOfPointsForTrackers;
