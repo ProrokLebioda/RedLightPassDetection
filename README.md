@@ -9,3 +9,4 @@ COPYRIGHTS USES:
 - A Large-Scale Car Dataset for Fine-Grained Categorization and Verification
   L. Yang, P. Luo, C. C. Loy, X. Tang, arXiv:1506.08959, 2015
 -
+https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/

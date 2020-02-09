@@ -64,16 +64,16 @@ private:
 	bool isRedLight;
 	float confThreshold = 0.5; // Confidence threshold
 	float nmsThreshold = 0.4;  // Non-maximum suppression threshold
-	int inpWidth = 416;  // Width of network's input image
-	int inpHeight = 416; // Height of network's input image
+	int inpWidth = 614;  // Width of network's input image
+	int inpHeight = 614; // Height of network's input image
 	vector<string> classes;
-	vector<string> trackerTypes = { "BOOSTING", "MIL", "KCF", "TLD", "MEDIANFLOW", "GOTURN", "MOSSE", "CSRT" };
-	vector<Rect> trackingBoxes;
+	/*vector<string> trackerTypes = { "BOOSTING", "MIL", "KCF", "TLD", "MEDIANFLOW", "GOTURN", "MOSSE", "CSRT" };
+	vector<Rect> trackingBoxes;*/
 
-	Ptr<Tracker> createTrackerByName(string trackerType);
+	//Ptr<Tracker> createTrackerByName(string trackerType);
 
-	bool isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2);
-	list<bool> toSkip;
+	//bool isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2);
+	//list<bool> toSkip;
 public:
 	MyDetector(string classesFile);
 
@@ -90,7 +90,7 @@ public:
 	// Draw the predicted bounding box
 	void drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i);
 
-	void updateTrackedObjects(Mat &frameCopy );
+	//void updateTrackedObjects(Mat &frameCopy );
 
 	// Get the names of the output layers
 	vector<String> getOutputsNames();
