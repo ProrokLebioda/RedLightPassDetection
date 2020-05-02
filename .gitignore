@@ -381,3 +381,5 @@ RedLightViolationDetection/RedLightViolationDetection/data/video/crossroad2.mkv
 RedLightViolationDetection/RedLightViolationDetection/data/video/00004_yolo_out_cpp.avi
 RedLightViolationDetection/RedLightViolationDetection/3rdparty/opencv411
 RedLightViolationDetection/RedLightViolationDetection/data/video/00004_savedout.avi
+*.avi
+*.mp4
