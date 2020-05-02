@@ -68,6 +68,9 @@ private:
 	vector<Rect> trackingBoxes;
 
 	Ptr<Tracker> createTrackerByName(string trackerType);
+	void drawTrackedObjects(Mat &frameCopy);
+
+	void putEfficiencyInformation();
 
 	bool isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2);
 	list<bool> toSkip;

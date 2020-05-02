@@ -37,6 +37,90 @@ Ptr<Tracker> MyDetector::createTrackerByName(string trackerType)
 	return tracker;
 }
 
+void MyDetector::drawTrackedObjects(Mat& frameCopy)
+{
+	list<Ptr<Tracker>>::iterator itTracker;
+	itTracker = singleTrackers.begin();
+
+	list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
+	itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
+
+	list<bool>::iterator itToSkip;
+	itToSkip = toSkip.begin();
+	for (int i = 0; i < singleTrackers.size(); i++)
+	{
+		itTracker = next(singleTrackers.begin(), i);
+		Ptr<Tracker> tracker = *itTracker;
+		Rect2d rect;
+		tracker->update(frame, rect);
+
+		itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
+
+		itToSkip = next(toSkip.begin(), i);
+
+		int centerX = rect.x + rect.width / 2;
+		int centerY = rect.y + rect.height;
+		Point2f centerOfObjectToTrack(centerX, centerY);
+
+		if (((carDetectionROI.x + carDetectionROI.width) > centerOfObjectToTrack.x) && (carDetectionROI.x < centerOfObjectToTrack.x))
+		{
+
+			rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
+			string label = format("No: %d", i);
+			cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+			rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
+
+			if (!itListOfVectorsOfPointsForTrackers->empty())
+			{
+				itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
+				vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
+
+				if (!points.empty())
+				{
+					Scalar color(0, 0, 255);
+					for (int j = 0; j < points.size() - 1; j++)
+					{
+						cv::line(frame, points[j], points[j + 1], color);
+						// add to detected
+						Point2f lineO(inX, inY);
+						Point2f lineP(outX, outY);
+						if (*itToSkip != true)
+						{
+							Point2f movementO(points[j].x, points[j].y);
+							Point2f movementP(points[j + 1].x, points[j + 1].y);
+
+							if (isIntersecting(lineO, lineP, movementO, movementP))
+							{
+								detectedPasses++;
+								*itToSkip = true;
+							}
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			singleTrackers.erase(itTracker);
+			listOfVectorsOfPointsForTrackers.erase(itListOfVectorsOfPointsForTrackers);
+			toSkip.erase(itToSkip);
+		}
+	}
+}
+
+void MyDetector::putEfficiencyInformation()
+{
+	// Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
+	vector<double> layersTimes;
+	double freq = getTickFrequency() / 1000;
+	double t = net.getPerfProfile(layersTimes) / freq;
+	string label = format("Inference time for a frame : %.2f ms", t);
+	putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+	label = format("Detected passes: %d", detectedPasses);
+	putText(frame, label, Point(frame.cols - 200, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+
+}
+
 bool MyDetector::isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2)
 {
 	//Point2f x = o2 - o1;
@@ -237,79 +321,13 @@ void MyDetector::detectionLoop()
 		// Draw tracked objects
 		if (!singleTrackers.empty())
 		{
-			list<Ptr<Tracker>>::iterator itTracker;
-			itTracker = singleTrackers.begin();
-
-			list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
-			itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
-
-			list<bool>::iterator itToSkip;
-			itToSkip = toSkip.begin();
-			for (int i = 0; i < singleTrackers.size();i++)
-			{
-				itTracker = next(singleTrackers.begin(), i);
-				Ptr<Tracker> tracker = *itTracker;
-				Rect2d rect;
-				tracker->update(frame, rect);				 
-				
-				itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
-
-				itToSkip = next(toSkip.begin(), i);
-
-				int centerX = rect.x + rect.width/2;
-				int centerY = rect.y + rect.height;
-				Point2f centerOfObjectToTrack(centerX, centerY);
-				
-				if (((carDetectionROI.x+carDetectionROI.width)>centerOfObjectToTrack.x)&&( carDetectionROI.x < centerOfObjectToTrack.x))
-				{
-					
-					rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
-					string label = format("No: %d", i);
-					cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
-					rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
-
-					if (!itListOfVectorsOfPointsForTrackers->empty())
-					{
-						itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
-						vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
-
-						if (!points.empty())
-						{
-							Scalar color(0, 0, 255);
-							for (int j = 0; j < points.size() - 1; j++)
-							{
-								cv::line(frame, points[j], points[j + 1], color);
-								// add to detected
-								Point2f lineO(inX, inY);
-								Point2f lineP(outX, outY);
-								if (*itToSkip != true)
-								{
-									Point2f movementO(points[j].x, points[j].y);
-									Point2f movementP(points[j + 1].x, points[j + 1].y);
-
-									if (isIntersecting(lineO, lineP, movementO, movementP))
-									{
-										detectedPasses++;
-										*itToSkip = true;
-									}
-								}
-							}
-						}
-					}
-				}
-				else
-				{
-					singleTrackers.erase(itTracker);
-					listOfVectorsOfPointsForTrackers.erase(itListOfVectorsOfPointsForTrackers);
-					toSkip.erase(itToSkip);
-				}
-			}
+			drawTrackedObjects(frameCopy);			
 		}
 	
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
-		frameCopy = frameCopy & sceneMask;
+		frameCopy = frameCopy/* & sceneMask*/;
 		blobFromImage(frameCopy, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
@@ -322,21 +340,12 @@ void MyDetector::detectionLoop()
 		// Remove the bounding boxes with low confidence
 		postprocess(frame, outs);
 
-		// Put efficiency information. The function getPerfProfile returns the overall time for inference(t) and the timings for each of the layers(in layersTimes)
-		vector<double> layersTimes;
-		double freq = getTickFrequency() / 1000;
-		double t = net.getPerfProfile(layersTimes) / freq;
-		string label = format("Inference time for a frame : %.2f ms", t);
-		putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
-		label = format("Detected passes: %d", detectedPasses);
-		putText(frame,label,Point(frame.cols-200, 15),FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
-
+		putEfficiencyInformation();
 		// Write the frame with the detection boxes
 		frame.convertTo(frame, CV_8U);
 		video.write(frame);
 		//cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		imshow(kWinName, frame);
-
 	}
 }
 
@@ -377,8 +386,15 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				boxes.push_back(Rect(left, top, width, height));
 				Point2f centerOfObjectToTrack(centerX,centerY);
 				//if (width>200&&height>200)
-				if (carDetectionROI.contains(centerOfObjectToTrack)&& ((left >= carDetectionROI.x)))
+				if (carDetectionROI.contains(centerOfObjectToTrack) && ((left >= carDetectionROI.x)))
+				{
+					//Check if not overlapping too much
+					for (Rect trBox : trackingBoxes)
+					{
+						
+					}
 					trackingBoxes.push_back(Rect(left, top, width, height));
+				}
 			}
 		}
 	}
