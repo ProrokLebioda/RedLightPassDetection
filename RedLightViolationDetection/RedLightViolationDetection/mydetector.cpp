@@ -37,54 +37,64 @@ Ptr<Tracker> MyDetector::createTrackerByName(string trackerType)
 	return tracker;
 }
 
+struct hasCrossed{
+bool operator()(Vehicle* vehicle) {
+	bool state = vehicle->getCrossedState();
+	return state; }
+};
+auto removeVehicles = [&](Vehicle* vehicle) -> bool
+{
+	bool state = vehicle->getOutOfBounds();
+	if (state)
+		vehicle->getVehicleTracker().release();
+	cout << "Remove Vehicle. Out of Bounds state: " << (bool)state<< endl;
+	return state;
+};
+
 void MyDetector::drawTrackedObjects(Mat& frameCopy)
 {
-	list<Ptr<Tracker>>::iterator itTracker;
-	itTracker = singleTrackers.begin();
 
-	list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
-	itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
+	int i = 0;
 
-	list<bool>::iterator itToSkip;
-	itToSkip = toSkip.begin();
-	for (int i = 0; i < singleTrackers.size(); i++)
+	for (Vehicle* vehicle : vehicles)
 	{
-		itTracker = next(singleTrackers.begin(), i);
-		Ptr<Tracker> tracker = *itTracker;
-		Rect2d rect;
+		if (vehicle->getOutOfBounds())
+			break;
+		Ptr<Tracker> tracker = vehicle->getVehicleTracker();
+		Rect2d rect /*= vehicle->getVehicleRect()*/;
 		tracker->update(frame, rect);
-
-		itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
-
-		itToSkip = next(toSkip.begin(), i);
-
+		//vehicle->setVehicleRect(rect);
 		int centerX = rect.x + rect.width / 2;
 		int centerY = rect.y + rect.height;
-		Point2f centerOfObjectToTrack(centerX, centerY);
-
-		if (((carDetectionROI.x + carDetectionROI.width) > centerOfObjectToTrack.x) && (carDetectionROI.x < centerOfObjectToTrack.x))
+		Point2f centerOfObjectToTrack(centerX, centerY);//it's really a center of bottom line
+		if (/*((carDetectionROI.x + carDetectionROI.width) > centerOfObjectToTrack.x) && (carDetectionROI.x < centerOfObjectToTrack.x)&&*/carDetectionROI.contains(centerOfObjectToTrack))
 		{
-
 			rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
 			string label = format("No: %d", i);
 			cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 			rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
 
-			if (!itListOfVectorsOfPointsForTrackers->empty())
+			/*if (vehicle->getVectorOfPointsForTracker().empty())
 			{
-				itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
-				vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
+				vehicle->getVectorOfPointsForTracker().push_back(centerOfObjectToTrack);
+			}*/
+
+			if (!vehicle->getVectorOfPointsForTracker().empty())
+			{
+				vehicle->addPoint(centerOfObjectToTrack);
+				vector<Point2f> points = vehicle->getVectorOfPointsForTracker();
 
 				if (!points.empty())
 				{
 					Scalar color(0, 0, 255);
+
 					for (int j = 0; j < points.size() - 1; j++)
 					{
 						cv::line(frame, points[j], points[j + 1], color);
 						// add to detected
 						Point2f lineO(inX, inY);
 						Point2f lineP(outX, outY);
-						if (*itToSkip != true)
+						if (!vehicle->getCrossedState())
 						{
 							Point2f movementO(points[j].x, points[j].y);
 							Point2f movementP(points[j + 1].x, points[j + 1].y);
@@ -92,20 +102,114 @@ void MyDetector::drawTrackedObjects(Mat& frameCopy)
 							if (isIntersecting(lineO, lineP, movementO, movementP))
 							{
 								detectedPasses++;
-								*itToSkip = true;
+								vehicle->setCrossedState(true);
 							}
 						}
 					}
 				}
 			}
+		
 		}
 		else
 		{
-			singleTrackers.erase(itTracker);
-			listOfVectorsOfPointsForTrackers.erase(itListOfVectorsOfPointsForTrackers);
-			toSkip.erase(itToSkip);
+			if(vehicle->getVehicleRect().y < carDetectionROI.y)
+				vehicle->setOutOfBounds(true);
 		}
+		
+		i++;
 	}
+	list<Vehicle*> tempVehicles;
+	for (Vehicle* vehicle : vehicles)
+	{
+		if (!vehicle->getOutOfBounds())
+			tempVehicles.push_back(vehicle);
+	}
+
+	if (!tempVehicles.empty())
+	{
+		vehicles.clear();
+		vehicles = tempVehicles;
+	}
+	
+	//remove_if(vehicles.begin(), vehicles.end(), removeVehicles);
+	//vehicles.remove_if(hasCrossed());
+	///
+	//list<Ptr<Tracker>>::iterator itTracker;
+	//itTracker = singleTrackers.begin();
+
+	//list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
+	//itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
+
+	//list<bool>::iterator itToSkip;
+	//itToSkip = toSkip.begin();
+	//for (int i = 0; i < singleTrackers.size(); i++)
+	//{
+	//	itTracker = next(singleTrackers.begin(), i);
+	//	Ptr<Tracker> tracker = *itTracker;
+	//	Rect2d rect;
+	//	tracker->update(frame, rect);
+
+	//	itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
+
+	//	itToSkip = next(toSkip.begin(), i);
+
+	//	int centerX = rect.x + rect.width / 2;
+	//	int centerY = rect.y + rect.height;
+	//	Point2f centerOfObjectToTrack(centerX, centerY);
+
+	//	if (/*((carDetectionROI.x + carDetectionROI.width) > centerOfObjectToTrack.x) && (carDetectionROI.x < centerOfObjectToTrack.x)&&*/carDetectionROI.contains(centerOfObjectToTrack))
+	//	{
+	//		rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
+	//		string label = format("No: %d", i);
+	//		cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+	//		rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
+
+	//		if (itListOfVectorsOfPointsForTrackers->empty())
+	//		{
+	//			itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
+	//		}
+
+	//		if (!itListOfVectorsOfPointsForTrackers->empty())
+	//		{
+	//			itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
+	//			vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
+
+	//			if (!points.empty())
+	//			{
+	//				Scalar color(0, 0, 255);
+	//				for (int j = 0; j < points.size() -1; j++)
+	//				{
+	//					cv::line(frame, points[j], points[j + 1], color);
+	//					// add to detected
+	//					Point2f lineO(inX, inY);
+	//					Point2f lineP(outX, outY);
+	//					if (*itToSkip != true)
+	//					{
+	//						Point2f movementO(points[j].x, points[j].y);
+	//						Point2f movementP(points[j + 1].x, points[j + 1].y);
+
+	//						if (isIntersecting(lineO, lineP, movementO, movementP))
+	//						{
+	//							detectedPasses++;
+	//							*itToSkip = true;
+	//						}
+	//						else
+	//						{
+	//							*itToSkip = false;
+	//						}
+	//					}
+	//				}
+	//			}
+	//		}
+	//	}
+	//	else
+	//	{
+	//		singleTrackers.erase(itTracker);
+	//		//singleTrackers.remove_if(itTracker);
+	//		listOfVectorsOfPointsForTrackers.erase(itListOfVectorsOfPointsForTrackers);
+	//		toSkip.remove(true);//remove 
+	//	}
+	//}
 }
 
 void MyDetector::putEfficiencyInformation()
@@ -176,6 +280,8 @@ MyDetector::MyDetector(string classesFile) :
 	iLowV = 0;
 	iHighV = 255;
 	toSkip.clear();
+
+	vehicles.clear();
 }
 
 int MyDetector::detectorProgram(CommandLineParser parser)
@@ -289,7 +395,7 @@ void MyDetector::detectionLoop()
 	bool once = false;
 	Mat frameCopy;
 	
-	while (waitKey(30)!=(int)('q'))
+	while (cv::waitKey(30)!=(int)('q'))
 	{
 		// get frame from the video
 		cap >> frame;
@@ -297,12 +403,12 @@ void MyDetector::detectionLoop()
 		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
 		selectUserROI(once);
-		if (waitKey(30) == (int)('l'))
+		if (cv::waitKey(30) == (int)('l'))
 			setRedLightValues();
 
 		/*if (waitKey(30) == (int)('t'))
 		{*/
-			updateTrackedObjects(frameCopy);
+			updateTrackedObjects(frame); // adds detected vehicles
 		//}
 
 		if (detectRedLight())
@@ -318,11 +424,7 @@ void MyDetector::detectionLoop()
 			break;
 		}
 
-		// Draw tracked objects
-		if (!singleTrackers.empty())
-		{
-			drawTrackedObjects(frameCopy);			
-		}
+		
 	
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
@@ -337,9 +439,13 @@ void MyDetector::detectionLoop()
 		//vector<Mat> outs;
 		net.forward(outs, getOutputsNames());
 
-		// Remove the bounding boxes with low confidence
+		// Remove the bounding boxes with low confidence and paints the prediction boxes
 		postprocess(frame, outs);
-
+		// Draw tracked objects
+		if (!vehicles.empty())
+		{
+			drawTrackedObjects(frameCopy);
+		}
 		putEfficiencyInformation();
 		// Write the frame with the detection boxes
 		frame.convertTo(frame, CV_8U);
@@ -347,6 +453,38 @@ void MyDetector::detectionLoop()
 		//cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
 		imshow(kWinName, frame);
 	}
+}
+
+int compareBoxes(Rect rectOne, Rect rectTwo)
+{
+	//top left
+	int distancex = (rectTwo.x - rectOne.x) * (rectTwo.x - rectOne.x);
+	int distancey = (rectTwo.y - rectOne.y) * (rectTwo.y - rectOne.y);
+
+	double topLeftCalcdistance = sqrt(distancex + distancey);
+
+	//top Right
+	distancex = (rectTwo.x+rectTwo.width - rectOne.x + rectOne.width) * (rectTwo.x + rectTwo.width - rectOne.x + rectOne.width);
+	distancey = (rectTwo.y - rectOne.y) * (rectTwo.y - rectOne.y);
+
+	double topRightCalcdistance = sqrt(distancex + distancey);
+
+	////bottom Left
+	//distancex = (rectTwo.x - rectOne.x) * (rectTwo.x - rectOne.x);
+	//distancey = (rectTwo.y+ rectTwo.height - rectOne.y + rectOne.height) * (rectTwo.y + rectTwo.height - rectOne.y+rectOne.height);
+	//
+	//double bottomLeftCalcdistance = sqrt(distancex + distancey);
+
+	////bottom Right
+	//distancex = (rectTwo.x + rectTwo.width - rectOne.x + rectOne.width) * (rectTwo.x + rectTwo.width - rectOne.x + rectOne.width);
+	//distancey = (rectTwo.y + rectTwo.height - rectOne.y + rectOne.height) * (rectTwo.y + rectTwo.height - rectOne.y + rectOne.height);
+
+	//double bottomRightCalcdistance = sqrt(distancex + distancey);
+	cout << "Top Left distance: " << topLeftCalcdistance << " Top Right distance: " << topRightCalcdistance << endl;
+	if (topLeftCalcdistance <= 100.0 || topRightCalcdistance <=100.0 /*||bottomLeftCalcdistance<20.0 || bottomRightCalcdistance<20.0 */)
+		return 0;
+
+	return -1;
 }
 
 // Remove the bounding boxes with low confidence using non-maxima suppression
@@ -388,12 +526,20 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				//if (width>200&&height>200)
 				if (carDetectionROI.contains(centerOfObjectToTrack) && ((left >= carDetectionROI.x)))
 				{
+					Rect rect(left, top, width, height);
+					bool isDuplicated = false;
 					//Check if not overlapping too much
 					for (Rect trBox : trackingBoxes)
 					{
-						
+						if (compareBoxes(rect, trBox) == 0)// are the same
+						{
+							isDuplicated = true;
+							cout << "Duplicated box\n";
+							break;
+						}
 					}
-					trackingBoxes.push_back(Rect(left, top, width, height));
+					if (!isDuplicated)
+						trackingBoxes.push_back(rect);
 				}
 			}
 		}
@@ -439,7 +585,7 @@ void MyDetector::setRedLightValues()
 
 		imshow("Thresholded Frame", frameThresholded);
 		imshow("Original Frame", trafficLightFrame);
-		if (waitKey(30) == 27)
+		if (cv::waitKey(30) == 27)
 		{
 			setWindowProperty("Thresholded Frame", cv::WindowPropertyFlags::WND_PROP_VISIBLE, 0.0);
 			setWindowProperty("Original Frame", cv::WindowPropertyFlags::WND_PROP_VISIBLE, 0.0);
@@ -513,24 +659,24 @@ void MyDetector::drawPred(int classId, float conf, int left, int top, int right,
 
 void MyDetector::updateTrackedObjects(Mat &frameCopy)
 {
+	// Specify the tracker type
+	string trackerType = "KCF";
+
 	if (!trackingBoxes.empty())
 	{
-		// Specify the tracker type
-		string trackerType = "KCF";
 		for (Rect2d rect : trackingBoxes)
 		{
-
+			
 			int centerX = rect.x + rect.width / 2;
 			int centerY = rect.y + rect.height;
 			Point2f centerOfObjectToTrack(centerX, centerY);
 
 			Ptr<TrackerKCF> trackerKCF = TrackerKCF::create();
 			trackerKCF->init(frameCopy, rect);
-			singleTrackers.push_back(trackerKCF);
-			vector<Point2f> pointsForTracker;
-			pointsForTracker.push_back(centerOfObjectToTrack);
-			listOfVectorsOfPointsForTrackers.push_back(pointsForTracker);
-			toSkip.push_back(false);
+
+			Vehicle* vehicle = new Vehicle(rect,centerOfObjectToTrack,trackerKCF);
+
+			vehicles.push_back(vehicle);
 		}
 	}
 }

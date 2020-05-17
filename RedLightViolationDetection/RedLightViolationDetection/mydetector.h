@@ -1,16 +1,5 @@
 #pragma once
-
-#include <fstream>
-#include <sstream>
-#include <iostream>
-#include <cmath>
-
-#include <opencv2/opencv.hpp>
-#include <opencv2/dnn.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
-#include "opencv2/tracking/tracker.hpp"
-
+#include "vehicle.h"
 
 class Blob;
 using namespace cv;
@@ -74,6 +63,8 @@ private:
 
 	bool isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2);
 	list<bool> toSkip;
+
+	list<Vehicle*> vehicles;
 public:
 	MyDetector(string classesFile);
 
