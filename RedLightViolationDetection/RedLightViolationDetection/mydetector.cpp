@@ -63,22 +63,23 @@ void MyDetector::drawTrackedObjects(Mat& frameCopy)
 		Ptr<Tracker> tracker = vehicle->getVehicleTracker();
 		Rect2d rect /*= vehicle->getVehicleRect()*/;
 		tracker->update(frame, rect);
-		//vehicle->setVehicleRect(rect);
+		vehicle->setVehicleRect(rect);
 		int centerX = rect.x + rect.width / 2;
 		int centerY = rect.y + rect.height;
 		Point2f centerOfObjectToTrack(centerX, centerY);//it's really a center of bottom line
 		if (/*((carDetectionROI.x + carDetectionROI.width) > centerOfObjectToTrack.x) && (carDetectionROI.x < centerOfObjectToTrack.x)&&*/carDetectionROI.contains(centerOfObjectToTrack))
 		{
 			rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
+			circle(frame, centerOfObjectToTrack, 5.0, cv::Scalar(0, 255, 0), 2, 1);
 			string label = format("No: %d", i);
 			cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
-			rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
+			rectangle(frameCopy, rect, cv::Scalar(0, 0, 0), -2, 1);//paint so that detection will ignore
 
 			/*if (vehicle->getVectorOfPointsForTracker().empty())
 			{
 				vehicle->getVectorOfPointsForTracker().push_back(centerOfObjectToTrack);
 			}*/
-
+			trackingBoxes;
 			if (!vehicle->getVectorOfPointsForTracker().empty())
 			{
 				vehicle->addPoint(centerOfObjectToTrack);
@@ -99,7 +100,7 @@ void MyDetector::drawTrackedObjects(Mat& frameCopy)
 							Point2f movementO(points[j].x, points[j].y);
 							Point2f movementP(points[j + 1].x, points[j + 1].y);
 
-							if (isIntersecting(lineO, lineP, movementO, movementP))
+							if (vehicle->isIntersecting(lineO, lineP, movementO, movementP))
 							{
 								detectedPasses++;
 								vehicle->setCrossedState(true);
@@ -131,7 +132,7 @@ void MyDetector::drawTrackedObjects(Mat& frameCopy)
 		vehicles = tempVehicles;
 	}
 	
-	//remove_if(vehicles.begin(), vehicles.end(), removeVehicles);
+	remove_if(vehicles.begin(), vehicles.end(), removeVehicles);
 	//vehicles.remove_if(hasCrossed());
 	///
 	//list<Ptr<Tracker>>::iterator itTracker;
@@ -408,7 +409,7 @@ void MyDetector::detectionLoop()
 
 		/*if (waitKey(30) == (int)('t'))
 		{*/
-			updateTrackedObjects(frame); // adds detected vehicles
+			 // adds detected vehicles
 		//}
 
 		if (detectRedLight())
@@ -429,7 +430,7 @@ void MyDetector::detectionLoop()
 		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
-		frameCopy = frameCopy/* & sceneMask*/;
+		//frameCopy = frameCopy/* & sceneMask*/;
 		blobFromImage(frameCopy, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
@@ -440,7 +441,8 @@ void MyDetector::detectionLoop()
 		net.forward(outs, getOutputsNames());
 
 		// Remove the bounding boxes with low confidence and paints the prediction boxes
-		postprocess(frame, outs);
+		postprocess(frameCopy, outs);
+		updateTrackedObjects(frame);
 		// Draw tracked objects
 		if (!vehicles.empty())
 		{
@@ -481,7 +483,7 @@ int compareBoxes(Rect rectOne, Rect rectTwo)
 
 	//double bottomRightCalcdistance = sqrt(distancex + distancey);
 	cout << "Top Left distance: " << topLeftCalcdistance << " Top Right distance: " << topRightCalcdistance << endl;
-	if (topLeftCalcdistance <= 100.0 || topRightCalcdistance <=100.0 /*||bottomLeftCalcdistance<20.0 || bottomRightCalcdistance<20.0 */)
+	if (topLeftCalcdistance <= 50.0 || topRightCalcdistance <=50.0 /*||bottomLeftCalcdistance<20.0 || bottomRightCalcdistance<20.0 */)
 		return 0;
 
 	return -1;
@@ -519,42 +521,61 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				int left = centerX - width / 2;
 				int top = centerY - height / 2;
 
-				classIds.push_back(classIdPoint.x);
-				confidences.push_back((float)confidence);
-				boxes.push_back(Rect(left, top, width, height));
+				
 				Point2f centerOfObjectToTrack(centerX,centerY);
 				//if (width>200&&height>200)
 				if (carDetectionROI.contains(centerOfObjectToTrack) && ((left >= carDetectionROI.x)))
 				{
-					Rect rect(left, top, width, height);
-					bool isDuplicated = false;
-					//Check if not overlapping too much
-					for (Rect trBox : trackingBoxes)
-					{
-						if (compareBoxes(rect, trBox) == 0)// are the same
-						{
-							isDuplicated = true;
-							cout << "Duplicated box\n";
-							break;
-						}
-					}
-					if (!isDuplicated)
-						trackingBoxes.push_back(rect);
+					classIds.push_back(classIdPoint.x);
+					confidences.push_back((float)confidence);
+					boxes.push_back(Rect(left, top, width, height));
+					
 				}
 			}
 		}
+
+		
+		//Check if not overlapping too much
+		for (Rect newBox : boxes)
+		{
+			bool isDuplicated = false;
+			for (Vehicle* vehicle : vehicles)
+			{
+				if (compareBoxes(newBox, vehicle->getVehicleRect()) == 0)// are the same
+				{
+					isDuplicated = true;
+					cout << "Duplicated Vehicle box\n";
+					break;
+				}
+			}
+			for (Rect trBox : trackingBoxes)
+			{
+				if (compareBoxes(newBox, trBox) == 0)// are the same
+				{
+					isDuplicated = true;
+					cout << "Duplicated trBox\n";
+					break;
+				}
+			}
+			if (!isDuplicated)
+				trackingBoxes.push_back(newBox);
+		}
+		
 	}
 
 	// Perform non maximum suppression to eliminate redundant overlapping boxes with
 	// lower confidences
 	vector<int> indices;
-	NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
-	for (size_t i = 0; i < indices.size(); ++i)
+	if (!boxes.empty())
 	{
-		int idx = indices[i];
-		Rect box = boxes[idx];
-		drawPred(classIds[idx], confidences[idx], box.x, box.y,
-			box.x + box.width, box.y + box.height, frame, i);
+		NMSBoxes(boxes, confidences, confThreshold, nmsThreshold, indices);
+		for (size_t i = 0; i < indices.size(); ++i)
+		{
+			int idx = indices[i];
+			Rect box = boxes[idx];
+			drawPred(classIds[idx], confidences[idx], box.x, box.y,
+				box.x + box.width, box.y + box.height, frame, i);
+		}
 	}
 }
 
@@ -664,6 +685,7 @@ void MyDetector::updateTrackedObjects(Mat &frameCopy)
 
 	if (!trackingBoxes.empty())
 	{
+		cout << "Tracking boxes size: " << trackingBoxes.size() << endl;
 		for (Rect2d rect : trackingBoxes)
 		{
 			
@@ -679,6 +701,7 @@ void MyDetector::updateTrackedObjects(Mat &frameCopy)
 			vehicles.push_back(vehicle);
 		}
 	}
+	trackingBoxes.clear();
 }
 
 // Get the names of the output layers

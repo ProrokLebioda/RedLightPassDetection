@@ -9,10 +9,6 @@ using namespace std;
 //function responsible for taking position of pass line
 void CallBackFunc(int event, int x, int y, int flags, void* userdata);
 
-inline double Det(double a, double b, double c, double d)
-{
-	return a * d - b * c;
-}
 
 class MyDetector
 {
