@@ -17,7 +17,7 @@ private:
 	Net net;
 	VideoCapture cap;
 	VideoWriter video;
-	Mat frame, blob;
+	Mat mainFrame, blob;
 	Mat sceneMask;
 	string outputFile;
 	string kWinName;

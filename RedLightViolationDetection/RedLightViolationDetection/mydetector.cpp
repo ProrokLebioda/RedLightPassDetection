@@ -51,38 +51,40 @@ auto removeVehicles = [&](Vehicle* vehicle) -> bool
 	return state;
 };
 
+auto removeWatchdog = [&](Vehicle* vehicle) -> bool
+{
+	int timer = vehicle->getTimer();
+	cout << "I'm sorry,Dave. I have to remove you: " << (int)timer << endl;
+	return timer < 0;
+};
+
 void MyDetector::drawTrackedObjects(Mat& frameCopy)
 {
-
 	int i = 0;
 
 	for (Vehicle* vehicle : vehicles)
 	{
 		if (vehicle->getOutOfBounds())
 			break;
+		vehicle->resetTimer();
 		Ptr<Tracker> tracker = vehicle->getVehicleTracker();
 		Rect2d rect /*= vehicle->getVehicleRect()*/;
-		tracker->update(frame, rect);
+		tracker->update(frameCopy, rect);
 		vehicle->setVehicleRect(rect);
 		int centerX = rect.x + rect.width / 2;
-		int centerY = rect.y + rect.height;
-		Point2f centerOfObjectToTrack(centerX, centerY);//it's really a center of bottom line
-		if (/*((carDetectionROI.x + carDetectionROI.width) > centerOfObjectToTrack.x) && (carDetectionROI.x < centerOfObjectToTrack.x)&&*/carDetectionROI.contains(centerOfObjectToTrack))
+		int bottomCenterY = rect.y + rect.height;
+		Point2f bottomCenterOfObjectToTrack(centerX, bottomCenterY);//it's really a center of bottom line
+		if (/*((carDetectionROI.x + carDetectionROI.width) > centerOfObjectToTrack.x) && (carDetectionROI.x < centerOfObjectToTrack.x)&&*/carDetectionROI.contains(bottomCenterOfObjectToTrack))
 		{
-			rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
-			circle(frame, centerOfObjectToTrack, 5.0, cv::Scalar(0, 255, 0), 2, 1);
+			rectangle(mainFrame, rect, cv::Scalar(0, 0, 255), 2, 1);
+			circle(mainFrame, bottomCenterOfObjectToTrack, 5.0, cv::Scalar(0, 255, 0), 2, 1);
 			string label = format("No: %d", i);
-			cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+			cv::putText(mainFrame, label, Point(bottomCenterOfObjectToTrack.x, bottomCenterOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 			rectangle(frameCopy, rect, cv::Scalar(0, 0, 0), -2, 1);//paint so that detection will ignore
 
-			/*if (vehicle->getVectorOfPointsForTracker().empty())
-			{
-				vehicle->getVectorOfPointsForTracker().push_back(centerOfObjectToTrack);
-			}*/
-			trackingBoxes;
 			if (!vehicle->getVectorOfPointsForTracker().empty())
 			{
-				vehicle->addPoint(centerOfObjectToTrack);
+				vehicle->addPoint(bottomCenterOfObjectToTrack);
 				vector<Point2f> points = vehicle->getVectorOfPointsForTracker();
 
 				if (!points.empty())
@@ -91,7 +93,7 @@ void MyDetector::drawTrackedObjects(Mat& frameCopy)
 
 					for (int j = 0; j < points.size() - 1; j++)
 					{
-						cv::line(frame, points[j], points[j + 1], color);
+						cv::line(mainFrame, points[j], points[j + 1], color);
 						// add to detected
 						Point2f lineO(inX, inY);
 						Point2f lineP(outX, outY);
@@ -104,12 +106,19 @@ void MyDetector::drawTrackedObjects(Mat& frameCopy)
 							{
 								detectedPasses++;
 								vehicle->setCrossedState(true);
+
+								cv::Mat imageToSave = mainFrame(vehicle->getVehicleRect());
+									
+								string filename = "savedViolations/criminal" + to_string(detectedPasses) + ".jpg";
+								imageToSave.convertTo(imageToSave, IMWRITE_JPEG_QUALITY);
+
+								imwrite(filename, imageToSave);
+
 							}
 						}
 					}
 				}
 			}
-		
 		}
 		else
 		{
@@ -133,84 +142,6 @@ void MyDetector::drawTrackedObjects(Mat& frameCopy)
 	}
 	
 	remove_if(vehicles.begin(), vehicles.end(), removeVehicles);
-	//vehicles.remove_if(hasCrossed());
-	///
-	//list<Ptr<Tracker>>::iterator itTracker;
-	//itTracker = singleTrackers.begin();
-
-	//list<vector<Point2f>>::iterator itListOfVectorsOfPointsForTrackers;
-	//itListOfVectorsOfPointsForTrackers = listOfVectorsOfPointsForTrackers.begin();
-
-	//list<bool>::iterator itToSkip;
-	//itToSkip = toSkip.begin();
-	//for (int i = 0; i < singleTrackers.size(); i++)
-	//{
-	//	itTracker = next(singleTrackers.begin(), i);
-	//	Ptr<Tracker> tracker = *itTracker;
-	//	Rect2d rect;
-	//	tracker->update(frame, rect);
-
-	//	itListOfVectorsOfPointsForTrackers = next(listOfVectorsOfPointsForTrackers.begin(), i);
-
-	//	itToSkip = next(toSkip.begin(), i);
-
-	//	int centerX = rect.x + rect.width / 2;
-	//	int centerY = rect.y + rect.height;
-	//	Point2f centerOfObjectToTrack(centerX, centerY);
-
-	//	if (/*((carDetectionROI.x + carDetectionROI.width) > centerOfObjectToTrack.x) && (carDetectionROI.x < centerOfObjectToTrack.x)&&*/carDetectionROI.contains(centerOfObjectToTrack))
-	//	{
-	//		rectangle(frame, rect, cv::Scalar(0, 0, 255), 2, 1);
-	//		string label = format("No: %d", i);
-	//		cv::putText(frame, label, Point(centerOfObjectToTrack.x, centerOfObjectToTrack.y), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
-	//		rectangle(frameCopy, rect, cv::Scalar(0, 0, 255), -2, 1);//paint so that detection will ignore
-
-	//		if (itListOfVectorsOfPointsForTrackers->empty())
-	//		{
-	//			itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
-	//		}
-
-	//		if (!itListOfVectorsOfPointsForTrackers->empty())
-	//		{
-	//			itListOfVectorsOfPointsForTrackers->push_back(centerOfObjectToTrack);
-	//			vector<Point2f> points = *itListOfVectorsOfPointsForTrackers;
-
-	//			if (!points.empty())
-	//			{
-	//				Scalar color(0, 0, 255);
-	//				for (int j = 0; j < points.size() -1; j++)
-	//				{
-	//					cv::line(frame, points[j], points[j + 1], color);
-	//					// add to detected
-	//					Point2f lineO(inX, inY);
-	//					Point2f lineP(outX, outY);
-	//					if (*itToSkip != true)
-	//					{
-	//						Point2f movementO(points[j].x, points[j].y);
-	//						Point2f movementP(points[j + 1].x, points[j + 1].y);
-
-	//						if (isIntersecting(lineO, lineP, movementO, movementP))
-	//						{
-	//							detectedPasses++;
-	//							*itToSkip = true;
-	//						}
-	//						else
-	//						{
-	//							*itToSkip = false;
-	//						}
-	//					}
-	//				}
-	//			}
-	//		}
-	//	}
-	//	else
-	//	{
-	//		singleTrackers.erase(itTracker);
-	//		//singleTrackers.remove_if(itTracker);
-	//		listOfVectorsOfPointsForTrackers.erase(itListOfVectorsOfPointsForTrackers);
-	//		toSkip.remove(true);//remove 
-	//	}
-	//}
 }
 
 void MyDetector::putEfficiencyInformation()
@@ -220,9 +151,9 @@ void MyDetector::putEfficiencyInformation()
 	double freq = getTickFrequency() / 1000;
 	double t = net.getPerfProfile(layersTimes) / freq;
 	string label = format("Inference time for a frame : %.2f ms", t);
-	putText(frame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+	putText(mainFrame, label, Point(0, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 	label = format("Detected passes: %d", detectedPasses);
-	putText(frame, label, Point(frame.cols - 200, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
+	putText(mainFrame, label, Point(mainFrame.cols - 200, 15), FONT_HERSHEY_SIMPLEX, 0.5, Scalar(0, 0, 255));
 
 }
 
@@ -300,15 +231,15 @@ int MyDetector::detectorProgram(CommandLineParser parser)
 	namedWindow(kWinName, WINDOW_NORMAL);
 	//set the callback function for any mouse event
 	setMouseCallback(kWinName, CallBackFunc, NULL);
-	cap >> frame;
-
+	cap >> mainFrame;
+	//resize(mainFrame, mainFrame, Size(mainFrame.cols * 0.50, mainFrame.rows * 0.50), 0, 0, INTER_CUBIC);
 	while (cv::waitKey(1) && !endLine)
 	{
-		putText(frame, "Paint line", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
-		cv::circle(frame, cv::Point(inX, inY), 1, Scalar(255, 0, 0));
-		cv::circle(frame, cv::Point(outX, outY), 1, Scalar(255, 0, 0));
+		putText(mainFrame, "Paint line", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
+		cv::circle(mainFrame, cv::Point(inX, inY), 1, Scalar(255, 0, 0));
+		cv::circle(mainFrame, cv::Point(outX, outY), 1, Scalar(255, 0, 0));
 
-		imshow(kWinName, frame);
+		imshow(kWinName, mainFrame);
 
 	}
 
@@ -374,16 +305,16 @@ void MyDetector::selectUserROI(bool &once)
 	if (!once)// Select ROI
 	{
 		Mat frameTemp;
-		frame.copyTo(frameTemp);
+		mainFrame.copyTo(frameTemp);
 
 		putText(frameTemp, "Select car detection area", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
 		carDetectionROI = selectROI(kWinName, frameTemp);
 
-		frame.copyTo(frameTemp);
+		mainFrame.copyTo(frameTemp);
 		putText(frameTemp, "Select traffic light area", Point(100, 150), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(255, 0, 255), 10);
 		trafficLightROI = selectROI(kWinName, frameTemp);
-		croppedFrame = frame(carDetectionROI);
-		trafficLightFrame = frame(trafficLightROI);
+		croppedFrame = mainFrame(carDetectionROI);
+		trafficLightFrame = mainFrame(trafficLightROI);
 
 		once = true;
 
@@ -394,15 +325,18 @@ void MyDetector::selectUserROI(bool &once)
 void MyDetector::detectionLoop()
 {
 	bool once = false;
-	Mat frameCopy;
+	Mat mainFrameCopy;
+	Mat workFrame;
 	
 	while (cv::waitKey(30)!=(int)('q'))
 	{
 		// get frame from the video
-		cap >> frame;
-		frame.copyTo(frameCopy);
-		cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
-		//resize(frame, frame,Size(frame.cols*0.75,frame.rows*0.75), 0, 0, INTER_CUBIC);
+		cap >> mainFrame;
+		//resize(mainFrame, mainFrame,Size(mainFrame.cols*0.50, mainFrame.rows*0.50), 0, 0, INTER_CUBIC);
+		mainFrame.copyTo(mainFrameCopy);
+		mainFrame.copyTo(workFrame);
+		cv::line(mainFrame, Point(inX, inY), Point(outX, outY), (0, 0, 255),5);
+		
 		selectUserROI(once);
 		if (cv::waitKey(30) == (int)('l'))
 			setRedLightValues();
@@ -413,11 +347,11 @@ void MyDetector::detectionLoop()
 		//}
 
 		if (detectRedLight())
-			putText(frame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
+			putText(mainFrame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
 		else
-			putText(frame, "Not red light", Point(trafficLightROI.x+trafficLightFrame.cols+10, trafficLightROI.y + trafficLightFrame.rows/2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 255, 0), 5);
+			putText(mainFrame, "Not red light", Point(trafficLightROI.x+trafficLightFrame.cols+10, trafficLightROI.y + trafficLightFrame.rows/2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 255, 0), 5);
 		// Stop the program if we reached end of video
-		if (frame.empty())
+		if (mainFrame.empty())
 		{
 			cout << "Done processing !!!" << endl;
 			cout << "Output file is stored as " << outputFile << endl;
@@ -427,11 +361,11 @@ void MyDetector::detectionLoop()
 
 		
 	
-		cv::rectangle(frame, carDetectionROI, cv::Scalar(255, 0, 0));
-		cv::rectangle(frame, trafficLightROI, cv::Scalar(0, 255, 0));
+		cv::rectangle(mainFrame, carDetectionROI, cv::Scalar(255, 0, 0));
+		cv::rectangle(mainFrame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
 		//frameCopy = frameCopy/* & sceneMask*/;
-		blobFromImage(frameCopy, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
+		blobFromImage(mainFrame, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
 		net.setInput(blob);
@@ -439,21 +373,32 @@ void MyDetector::detectionLoop()
 		// Runs the forward pass to get output of the output layers
 		//vector<Mat> outs;
 		net.forward(outs, getOutputsNames());
-
-		// Remove the bounding boxes with low confidence and paints the prediction boxes
-		postprocess(frameCopy, outs);
-		updateTrackedObjects(frame);
-		// Draw tracked objects
 		if (!vehicles.empty())
 		{
-			drawTrackedObjects(frameCopy);
+			drawTrackedObjects(mainFrameCopy);
 		}
+		// Remove the bounding boxes with low confidence and paints the prediction boxes
+		postprocess(mainFrame, outs);
+		updateTrackedObjects(mainFrameCopy);
+		for (Vehicle* vehicle : vehicles)
+		{
+			vehicle->decreaseTimer();
+		
+		}
+		remove_if(vehicles.begin(), vehicles.end(), removeWatchdog);
+		/*if (waitKey(30) == (int)('t'))
+		{*/
+		
+		//}
+		
+		// Draw tracked objects
+		
 		putEfficiencyInformation();
 		// Write the frame with the detection boxes
-		frame.convertTo(frame, CV_8U);
-		video.write(frame);
+		mainFrame.convertTo(mainFrame, CV_8U);
+		video.write(mainFrame);
 		//cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
-		imshow(kWinName, frame);
+		imshow(kWinName, mainFrame);
 	}
 }
 
@@ -483,7 +428,7 @@ int compareBoxes(Rect rectOne, Rect rectTwo)
 
 	//double bottomRightCalcdistance = sqrt(distancex + distancey);
 	cout << "Top Left distance: " << topLeftCalcdistance << " Top Right distance: " << topRightCalcdistance << endl;
-	if (topLeftCalcdistance <= 50.0 || topRightCalcdistance <=50.0 /*||bottomLeftCalcdistance<20.0 || bottomRightCalcdistance<20.0 */)
+	if (topLeftCalcdistance <= 100.0 || topRightCalcdistance <=100.0 /*||bottomLeftCalcdistance<20.0 || bottomRightCalcdistance<20.0 */)
 		return 0;
 
 	return -1;
@@ -523,13 +468,11 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 
 				
 				Point2f centerOfObjectToTrack(centerX,centerY);
-				//if (width>200&&height>200)
 				if (carDetectionROI.contains(centerOfObjectToTrack) && ((left >= carDetectionROI.x)))
 				{
 					classIds.push_back(classIdPoint.x);
 					confidences.push_back((float)confidence);
 					boxes.push_back(Rect(left, top, width, height));
-					
 				}
 			}
 		}
@@ -622,7 +565,7 @@ bool MyDetector::detectRedLight()
 	int detectedHueCount=0;
 	double percentage=0.0;
 
-	trafficLightFrame = frame(trafficLightROI);
+	trafficLightFrame = mainFrame(trafficLightROI);
 	Mat frameHSV;
 	cvtColor(trafficLightFrame, frameHSV, COLOR_BGR2HSV);
 	//Mat frameThresholded;
