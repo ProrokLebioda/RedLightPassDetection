@@ -29,7 +29,7 @@ private:
 	Ptr<MultiTracker> multiTracker;
 	list<Ptr<Tracker>> singleTrackers;
 	list<vector<Point2f>> listOfVectorsOfPointsForTrackers;
-
+	bool isRedLight;
 	int detectedPasses;
 
 	int iLowH;//Assumed low Hue for red
@@ -43,7 +43,6 @@ private:
 
 	Mat frameThresholded;
 
-	bool isRedLight;
 	float confThreshold = 0.5; // Confidence threshold
 	float nmsThreshold = 0.4;  // Non-maximum suppression threshold
 	int inpWidth = 416;  // Width of network's input image
@@ -61,6 +60,8 @@ private:
 	list<bool> toSkip;
 
 	list<Vehicle*> vehicles;
+
+	double lightTimer;
 public:
 	MyDetector(string classesFile);
 
@@ -78,6 +79,11 @@ public:
 	void drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i);
 
 	void updateTrackedObjects(Mat &frameCopy );
+
+	//Helper method since we want to check light violation
+	void paintFakeStreetLightForCalibration(Mat &mF);
+	void paintFakeStreetLight(Mat &mF);
+
 
 	// Get the names of the output layers
 	vector<String> getOutputsNames();

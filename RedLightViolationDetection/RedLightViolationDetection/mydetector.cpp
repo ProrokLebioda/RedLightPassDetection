@@ -102,18 +102,17 @@ void MyDetector::drawTrackedObjects(Mat& frameCopy)
 							Point2f movementO(points[j].x, points[j].y);
 							Point2f movementP(points[j + 1].x, points[j + 1].y);
 
-							if (vehicle->isIntersecting(lineO, lineP, movementO, movementP))
+							if (vehicle->isIntersecting(lineO, lineP, movementO, movementP)&&isRedLight)
 							{
 								detectedPasses++;
 								vehicle->setCrossedState(true);
 
 								cv::Mat imageToSave = mainFrame(vehicle->getVehicleRect());
 									
-								string filename = "savedViolations/criminal" + to_string(detectedPasses) + ".jpg";
-								imageToSave.convertTo(imageToSave, IMWRITE_JPEG_QUALITY);
+								string filename = "savedViolations/criminal" + to_string(detectedPasses) + ".png";
+								imageToSave.convertTo(imageToSave, IMWRITE_PNG_COMPRESSION);
 
 								imwrite(filename, imageToSave);
-
 							}
 						}
 					}
@@ -198,7 +197,9 @@ bool MyDetector::isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2)
 MyDetector::MyDetector(string classesFile) :
 	confThreshold(0.5), nmsThreshold(0.4),
 	inpWidth(416), inpHeight(416),
-	detectedPasses(0)
+	detectedPasses(0),
+	isRedLight(false),
+	lightTimer(0.0)
 {
 	sceneMask = imread("data/image/00001mask.jpg");
 	//multiTracker = cv::MultiTracker::create();
@@ -332,7 +333,13 @@ void MyDetector::detectionLoop()
 	{
 		// get frame from the video
 		cap >> mainFrame;
+		lightTimer++;
 		//resize(mainFrame, mainFrame,Size(mainFrame.cols*0.50, mainFrame.rows*0.50), 0, 0, INTER_CUBIC);
+		if (!once)
+			paintFakeStreetLightForCalibration(mainFrame);
+		else
+			paintFakeStreetLight(mainFrame);
+
 		mainFrame.copyTo(mainFrameCopy);
 		mainFrame.copyTo(workFrame);
 		cv::line(mainFrame, Point(inX, inY), Point(outX, outY), (0, 0, 255),5);
@@ -346,7 +353,7 @@ void MyDetector::detectionLoop()
 			 // adds detected vehicles
 		//}
 
-		if (detectRedLight())
+		if (isRedLight=detectRedLight())
 			putText(mainFrame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
 		else
 			putText(mainFrame, "Not red light", Point(trafficLightROI.x+trafficLightFrame.cols+10, trafficLightROI.y + trafficLightFrame.rows/2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 255, 0), 5);
@@ -565,6 +572,8 @@ bool MyDetector::detectRedLight()
 	int detectedHueCount=0;
 	double percentage=0.0;
 
+	if (mainFrame.empty())
+		return false;
 	trafficLightFrame = mainFrame(trafficLightROI);
 	Mat frameHSV;
 	cvtColor(trafficLightFrame, frameHSV, COLOR_BGR2HSV);
@@ -645,6 +654,52 @@ void MyDetector::updateTrackedObjects(Mat &frameCopy)
 		}
 	}
 	trackingBoxes.clear();
+}
+
+void MyDetector::paintFakeStreetLightForCalibration(Mat& mF)
+{
+	Rect2d rect(Point2d(10, 100), Size2d(80, 220));
+	rectangle(mF, rect, cv::Scalar(0, 0, 0), -1, 1);
+	circle(mF, Point2d(50, 140), 30, Scalar(0, 0, 255), -1, 1);
+	circle(mF, Point2d(50, 210), 30, Scalar(0, 255, 255), -1, 1);
+	circle(mF, Point2d(50, 280), 30, Scalar(0, 255, 0), -1, 1);
+}
+
+void MyDetector::paintFakeStreetLight(Mat& mF)
+{
+	Rect2d rect(Point2d(10, 100), Size2d(80, 220));
+	rectangle(mF, rect, cv::Scalar(0, 0, 0), -1, 1);
+	if (lightTimer<240)
+	{
+		//RED
+		circle(mF, Point2d(50, 140), 30, Scalar(0, 0, 255), -1, 1);
+		circle(mF, Point2d(50, 210), 30, Scalar(255, 255, 255), 2, 1);
+		circle(mF, Point2d(50, 280), 30, Scalar(255, 255, 255), 2, 1);
+	}
+	else if (lightTimer >= 240 && lightTimer < 480)
+	{
+		//RED and YELLOW
+		circle(mF, Point2d(50, 140), 30, Scalar(0, 0, 255), -1, 1);
+		circle(mF, Point2d(50, 210), 30, Scalar(0, 255, 255), -1, 1);
+		circle(mF, Point2d(50, 280), 30, Scalar(255, 255, 255), 2, 1);
+	}
+	else if (lightTimer >= 480 && lightTimer < 760)
+	{
+		//GREEN
+		circle(mF, Point2d(50, 140), 30, Scalar(255, 255, 255), 2, 1);
+		circle(mF, Point2d(50, 210), 30, Scalar(255, 255, 255), 2, 1);
+		circle(mF, Point2d(50, 280), 30, Scalar(0, 255, 0), -1, 1);
+	}
+	else if (lightTimer >= 1000 && lightTimer<1240)
+	{
+		//YELLOW
+		circle(mF, Point2d(50, 140), 30, Scalar(255, 255, 255), 2, 1);
+		circle(mF, Point2d(50, 210), 30, Scalar(0, 255, 255), -1, 1);
+		circle(mF, Point2d(50, 280), 30, Scalar(255, 255, 255), 2, 1);
+	}
+	if (lightTimer >= 1240)
+		lightTimer = 0.0;
+	
 }
 
 // Get the names of the output layers
