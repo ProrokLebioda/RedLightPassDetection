@@ -383,3 +383,4 @@ RedLightViolationDetection/RedLightViolationDetection/3rdparty/opencv411
 RedLightViolationDetection/RedLightViolationDetection/data/video/00004_savedout.avi
 *.avi
 *.mp4
+RedLightViolationDetection/RedLightViolationDetection/savedViolations/

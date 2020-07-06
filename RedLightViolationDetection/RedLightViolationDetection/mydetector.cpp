@@ -204,14 +204,24 @@ MyDetector::MyDetector(string classesFile) :
 	sceneMask = imread("data/image/00001mask.jpg");
 	//multiTracker = cv::MultiTracker::create();
 	classesLine = loadClasses(classesFile);
-	iLowH = 165;//Assumed low Hue for red
-	iHighH = 179;//Assumed high Hue for red
+	//iLowH = 165;//Assumed low Hue for red
+	//iHighH = 179;//Assumed high Hue for red
 
-	iLowS = 0;
+	//iLowS = 0;
+	//iHighS = 255;
+
+	//iLowV = 0;
+	//iHighV = 255;
+
+	iLowH = 0;//Assumed low Hue for red
+	iHighH = 27;//Assumed high Hue for red
+
+	iLowS = 12;
 	iHighS = 255;
 
 	iLowV = 0;
 	iHighV = 255;
+
 	toSkip.clear();
 
 	vehicles.clear();
@@ -335,10 +345,13 @@ void MyDetector::detectionLoop()
 		cap >> mainFrame;
 		lightTimer++;
 		//resize(mainFrame, mainFrame,Size(mainFrame.cols*0.50, mainFrame.rows*0.50), 0, 0, INTER_CUBIC);
-		if (!once)
+		
+		
+		//uncomment to get  Fake light
+		/*if (!once)
 			paintFakeStreetLightForCalibration(mainFrame);
 		else
-			paintFakeStreetLight(mainFrame);
+			paintFakeStreetLight(mainFrame);*/
 
 		mainFrame.copyTo(mainFrameCopy);
 		mainFrame.copyTo(workFrame);
@@ -372,7 +385,7 @@ void MyDetector::detectionLoop()
 		cv::rectangle(mainFrame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
 		//frameCopy = frameCopy/* & sceneMask*/;
-		blobFromImage(mainFrame, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
+		blobFromImage(mainFrameCopy, blob, 1 / 255.0, cv::Size(inpWidth, inpHeight), Scalar(0, 0, 0), true, false);
 
 		//Sets the input to the network
 		net.setInput(blob);
@@ -385,7 +398,7 @@ void MyDetector::detectionLoop()
 			drawTrackedObjects(mainFrameCopy);
 		}
 		// Remove the bounding boxes with low confidence and paints the prediction boxes
-		postprocess(mainFrame, outs);
+		postprocess(mainFrameCopy, outs);
 		updateTrackedObjects(mainFrameCopy);
 		for (Vehicle* vehicle : vehicles)
 		{
@@ -676,28 +689,28 @@ void MyDetector::paintFakeStreetLight(Mat& mF)
 		circle(mF, Point2d(50, 210), 30, Scalar(255, 255, 255), 2, 1);
 		circle(mF, Point2d(50, 280), 30, Scalar(255, 255, 255), 2, 1);
 	}
-	else if (lightTimer >= 240 && lightTimer < 480)
+	else if (lightTimer >= 240 && lightTimer < 280)
 	{
 		//RED and YELLOW
 		circle(mF, Point2d(50, 140), 30, Scalar(0, 0, 255), -1, 1);
 		circle(mF, Point2d(50, 210), 30, Scalar(0, 255, 255), -1, 1);
 		circle(mF, Point2d(50, 280), 30, Scalar(255, 255, 255), 2, 1);
 	}
-	else if (lightTimer >= 480 && lightTimer < 760)
+	else if (lightTimer >= 280 && lightTimer < 460)
 	{
 		//GREEN
 		circle(mF, Point2d(50, 140), 30, Scalar(255, 255, 255), 2, 1);
 		circle(mF, Point2d(50, 210), 30, Scalar(255, 255, 255), 2, 1);
 		circle(mF, Point2d(50, 280), 30, Scalar(0, 255, 0), -1, 1);
 	}
-	else if (lightTimer >= 1000 && lightTimer<1240)
+	else if (lightTimer >= 460 && lightTimer<500)
 	{
 		//YELLOW
 		circle(mF, Point2d(50, 140), 30, Scalar(255, 255, 255), 2, 1);
 		circle(mF, Point2d(50, 210), 30, Scalar(0, 255, 255), -1, 1);
 		circle(mF, Point2d(50, 280), 30, Scalar(255, 255, 255), 2, 1);
 	}
-	if (lightTimer >= 1240)
+	if (lightTimer >= 500)
 		lightTimer = 0.0;
 	
 }
