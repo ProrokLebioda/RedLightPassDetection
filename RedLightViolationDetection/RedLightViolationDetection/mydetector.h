@@ -12,6 +12,32 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata);
 
 class MyDetector
 {
+public:
+	MyDetector(string classesFile);
+
+	int detectorProgram(CommandLineParser parser);//class execution
+	string loadClasses(string classesFile);
+	bool openVideoOrCam(CommandLineParser parser);
+	void loadNetwork();
+	void selectUserROI(bool &once);
+	void detectionLoop();
+	// Remove the bounding boxes with low confidence using non-maxima suppression
+	void postprocess(Mat& frame, const vector<Mat>& out);
+	void setRedLightValues();
+	bool detectRedLight();
+	// Draw the predicted bounding box
+	void drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i);
+
+	void updateTrackedObjects(Mat &frameCopy );
+
+	//Helper method since we want to check light violation
+	void paintFakeStreetLightForCalibration(Mat &mF);
+	void paintFakeStreetLight(Mat &mF);
+
+
+	// Get the names of the output layers
+	vector<String> getOutputsNames();
+
 private:
 	string classesLine;
 	Net net;
@@ -43,16 +69,16 @@ private:
 
 	Mat frameThresholded;
 
-	float confThreshold = 0.5; // Confidence threshold
-	float nmsThreshold = 0.4;  // Non-maximum suppression threshold
-	int inpWidth = 416;  // Width of network's input image
-	int inpHeight = 416; // Height of network's input image
+	float confThreshold = 0.7; // Confidence threshold
+	float nmsThreshold = 0.6;  // Non-maximum suppression threshold
+	int inpWidth = 512;  // Width of network's input image
+	int inpHeight = 512; // Height of network's input image
 	vector<string> classes;
 	vector<string> trackerTypes = { "BOOSTING", "MIL", "KCF", "TLD", "MEDIANFLOW", "GOTURN", "MOSSE", "CSRT" };
 	vector<Rect> trackingBoxes;
 
 	Ptr<Tracker> createTrackerByName(string trackerType);
-	void drawTrackedObjects(Mat &frameCopy);
+	void drawTrackedObjects(Mat& frameCopy);
 
 	void putEfficiencyInformation();
 
@@ -62,29 +88,4 @@ private:
 	list<Vehicle*> vehicles;
 
 	double lightTimer;
-public:
-	MyDetector(string classesFile);
-
-	int detectorProgram(CommandLineParser parser);//class execution
-	string loadClasses(string classesFile);
-	bool openVideoOrCam(CommandLineParser parser);
-	void loadNetwork();
-	void selectUserROI(bool &once);
-	void detectionLoop();
-	// Remove the bounding boxes with low confidence using non-maxima suppression
-	void postprocess(Mat& frame, const vector<Mat>& out);
-	void setRedLightValues();
-	bool detectRedLight();
-	// Draw the predicted bounding box
-	void drawPred(int classId, float conf, int left, int top, int right, int bottom, Mat& frame, int i);
-
-	void updateTrackedObjects(Mat &frameCopy );
-
-	//Helper method since we want to check light violation
-	void paintFakeStreetLightForCalibration(Mat &mF);
-	void paintFakeStreetLight(Mat &mF);
-
-
-	// Get the names of the output layers
-	vector<String> getOutputsNames();
 };

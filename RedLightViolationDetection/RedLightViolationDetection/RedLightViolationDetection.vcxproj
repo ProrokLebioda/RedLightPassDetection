@@ -157,13 +157,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="blob.h" />
     <ClInclude Include="mydetector.h" />
     <ClInclude Include="RedLightViolationDetection.h" />
     <ClInclude Include="vehicle.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="blob.cpp" />
     <ClCompile Include="mydetector.cpp" />
     <ClCompile Include="RedLightViolationDetection.cpp" />
     <ClCompile Include="vehicle.cpp" />

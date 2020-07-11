@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="blob.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="RedLightViolationDetection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -30,9 +27,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RedLightViolationDetection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="blob.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="mydetector.cpp">

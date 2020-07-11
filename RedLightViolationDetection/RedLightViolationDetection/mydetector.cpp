@@ -1,8 +1,6 @@
 
 #pragma once
 #include "mydetector.h"
-//#include "blob.h"
-//#include <conio.h>
 
 // globals for mouse callback
 int inX = 0, inY = 0;//starting position for pass line
@@ -158,13 +156,6 @@ void MyDetector::putEfficiencyInformation()
 
 bool MyDetector::isIntersecting(Point2f o1, Point2f p1, Point2f o2, Point2f p2)
 {
-	//Point2f x = o2 - o1;
-	//Point2f d1 = p1 - o1;
-	//Point2f d2 = p2 - o2;
-	
-	//double cross = d1.x * d2.y - d1.y * d2.x;
-	//if (std::abs(cross) < /*EPS*/1e-8)
-	//	return false;
 	float ixOut;
 	float iyOut;
 
@@ -344,8 +335,6 @@ void MyDetector::detectionLoop()
 		// get frame from the video
 		cap >> mainFrame;
 		lightTimer++;
-		//resize(mainFrame, mainFrame,Size(mainFrame.cols*0.50, mainFrame.rows*0.50), 0, 0, INTER_CUBIC);
-		
 		
 		//uncomment to get  Fake light
 		/*if (!once)
@@ -361,10 +350,6 @@ void MyDetector::detectionLoop()
 		if (cv::waitKey(30) == (int)('l'))
 			setRedLightValues();
 
-		/*if (waitKey(30) == (int)('t'))
-		{*/
-			 // adds detected vehicles
-		//}
 
 		if (isRedLight=detectRedLight())
 			putText(mainFrame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
@@ -378,9 +363,7 @@ void MyDetector::detectionLoop()
 			cv::waitKey(3000);
 			break;
 		}
-
-		
-	
+			
 		cv::rectangle(mainFrame, carDetectionROI, cv::Scalar(255, 0, 0));
 		cv::rectangle(mainFrame, trafficLightROI, cv::Scalar(0, 255, 0));
 		//cv::rectangle(frame, carBox, cv::Scalar(0, 0, 255));
@@ -391,7 +374,7 @@ void MyDetector::detectionLoop()
 		net.setInput(blob);
 
 		// Runs the forward pass to get output of the output layers
-		//vector<Mat> outs;
+
 		net.forward(outs, getOutputsNames());
 		if (!vehicles.empty())
 		{
@@ -406,18 +389,13 @@ void MyDetector::detectionLoop()
 		
 		}
 		remove_if(vehicles.begin(), vehicles.end(), removeWatchdog);
-		/*if (waitKey(30) == (int)('t'))
-		{*/
-		
-		//}
-		
 		// Draw tracked objects
 		
 		putEfficiencyInformation();
 		// Write the frame with the detection boxes
 		mainFrame.convertTo(mainFrame, CV_8U);
 		video.write(mainFrame);
-		//cv::line(frame, Point(inX, inY), Point(outX, outY), (0, 0, 255), 10);
+		
 		imshow(kWinName, mainFrame);
 	}
 }
@@ -485,8 +463,7 @@ void MyDetector::postprocess(Mat& frame, const vector<Mat>& outs)
 				int height = (int)(data[3] * frame.rows);
 				int left = centerX - width / 2;
 				int top = centerY - height / 2;
-
-				
+								
 				Point2f centerOfObjectToTrack(centerX,centerY);
 				if (carDetectionROI.contains(centerOfObjectToTrack) && ((left >= carDetectionROI.x)))
 				{
@@ -750,9 +727,5 @@ void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 		outY = y;
 		endLine = true;
 	}
-	//else if (event == EVENT_MOUSEMOVE)
-	//{
-	//	cout << "Mouse move over the window - position (" << x << ", " << y << ")" << endl;
 
-	//}
 }
