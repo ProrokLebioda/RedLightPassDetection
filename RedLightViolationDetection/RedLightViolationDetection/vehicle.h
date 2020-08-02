@@ -15,6 +15,7 @@ using namespace cv;
 
 #define WATCHDOG_VALUE 15
 
+//https://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
 inline double Det(double a, double b, double c, double d)
 {
 	return (a * d) - (b * c);

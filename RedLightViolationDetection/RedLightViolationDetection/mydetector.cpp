@@ -337,10 +337,10 @@ void MyDetector::detectionLoop()
 		lightTimer++;
 		
 		//uncomment to get  Fake light
-		/*if (!once)
+		if (!once)
 			paintFakeStreetLightForCalibration(mainFrame);
 		else
-			paintFakeStreetLight(mainFrame);*/
+			paintFakeStreetLight(mainFrame);
 
 		mainFrame.copyTo(mainFrameCopy);
 		mainFrame.copyTo(workFrame);
@@ -352,16 +352,16 @@ void MyDetector::detectionLoop()
 
 
 		if (isRedLight=detectRedLight())
-			putText(mainFrame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 0, 255), 5);
+			putText(mainFrame, "Red light", Point(trafficLightROI.x + trafficLightFrame.cols + 10, trafficLightROI.y + trafficLightFrame.rows / 2), HersheyFonts::FONT_HERSHEY_PLAIN, 3.0, Scalar(0, 0, 255), 2);
 		else
-			putText(mainFrame, "Not red light", Point(trafficLightROI.x+trafficLightFrame.cols+10, trafficLightROI.y + trafficLightFrame.rows/2), HersheyFonts::FONT_HERSHEY_PLAIN, 5.0, Scalar(0, 255, 0), 5);
+			putText(mainFrame, "Not red light", Point(trafficLightROI.x+trafficLightFrame.cols+10, trafficLightROI.y + trafficLightFrame.rows/2), HersheyFonts::FONT_HERSHEY_PLAIN, 3.0, Scalar(0, 255, 0), 2);
 		// Stop the program if we reached end of video
 		if (mainFrame.empty())
 		{
 			cout << "Done processing !!!" << endl;
 			cout << "Output file is stored as " << outputFile << endl;
 			cv::waitKey(3000);
-			break;
+			return;
 		}
 			
 		cv::rectangle(mainFrame, carDetectionROI, cv::Scalar(255, 0, 0));
@@ -395,7 +395,7 @@ void MyDetector::detectionLoop()
 		// Write the frame with the detection boxes
 		mainFrame.convertTo(mainFrame, CV_8U);
 		video.write(mainFrame);
-		
+
 		imshow(kWinName, mainFrame);
 	}
 }
@@ -567,7 +567,6 @@ bool MyDetector::detectRedLight()
 	trafficLightFrame = mainFrame(trafficLightROI);
 	Mat frameHSV;
 	cvtColor(trafficLightFrame, frameHSV, COLOR_BGR2HSV);
-	//Mat frameThresholded;
 	inRange(frameHSV, Scalar(iLowH, iLowS, iLowV), Scalar(iHighH, iHighS, iHighV), frameThresholded);
 	//morphological opening (remove small objects from the foreground)
 	erode(frameThresholded, frameThresholded, getStructuringElement(MORPH_ELLIPSE, Size(5, 5)));
