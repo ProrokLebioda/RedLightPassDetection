@@ -52,9 +52,9 @@ private:
 	Mat croppedFrame;
 	Mat trafficLightFrame;
 	vector<Mat> outs;
-	Ptr<MultiTracker> multiTracker;
-	list<Ptr<Tracker>> singleTrackers;
-	list<vector<Point2f>> listOfVectorsOfPointsForTrackers;
+	//Ptr<MultiTracker> multiTracker;
+	//list<Ptr<Tracker>> singleTrackers;
+	//list<vector<Point2f>> listOfVectorsOfPointsForTrackers;
 	bool isRedLight;
 	int detectedPasses;
 
